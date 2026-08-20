@@ -41,7 +41,7 @@ COPY deploy/modelscope/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 ENV APP_ENV=production
 ENV DEBUG=false
 ENV LLM_ENABLED=false
-ENV CORS_ORIGINS=*
+ENV CORS_ORIGINS=["*"]
 
 EXPOSE 7860
 
