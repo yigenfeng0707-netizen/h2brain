@@ -31,15 +31,21 @@ jobs:
             "https://gsym236998-h2brain.ms.show")
           echo "Direct URL: $DIRECT_CODE"
 
-          # 4. Ping API endpoint (keep backend alive)
+          # 4. Ping API health endpoint (keep backend alive)
           API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             -H "User-Agent: $UA" \
-            "https://gsym236998-h2brain.ms.show/api/operations")
-          echo "API endpoint: $API_CODE"
+            "https://gsym236998-h2brain.ms.show/api/v1/health")
+          echo "API health: $API_CODE"
 
-          # 5. Summary
-          if [ "$DIRECT_CODE" = "200" ]; then
-            echo "✅ Container is alive"
+          # 5. Ping operations endpoint (keep data endpoint alive)
+          OPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "User-Agent: $UA" \
+            "https://gsym236998-h2brain.ms.show/api/v1/operations/summary")
+          echo "Operations API: $OPS_CODE"
+
+          # 6. Summary
+          if [ "$DIRECT_CODE" = "200" ] && [ "$API_CODE" = "200" ]; then
+            echo "✅ Container is alive (frontend + backend)"
           else
-            echo "⚠️ Direct URL returned $DIRECT_CODE"
+            echo "⚠️ Frontend: $DIRECT_CODE, Backend: $API_CODE"
           fi
