@@ -1,0 +1,22 @@
+# 氢智行 H2Brain - FastAPI Backend
+
+# Web framework
+fastapi>=0.115.6
+uvicorn[standard]>=0.34.0
+pydantic>=2.12.5
+pydantic-settings>=2.7.1
+python-dotenv>=1.0.1
+
+# LLM / Agent
+openai==1.59.3
+httpx==0.28.1
+
+# Data
+numpy==2.2.1
+faker==33.3.1
+
+# Monitoring
+prometheus-client==0.21.1
+
+# Rate limiting
+slowapi==0.1.9

@@ -1,0 +1,87 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 氢智行 H2Brain 全局样式 - 深色氢能绿大屏 */
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  background: #051811;
+  color: #e0f5e8;
+  font-family: 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+}
+
+html {
+  font-size: 12px;
+}
+@media (min-width: 768px) {
+  html { font-size: 13px; }
+}
+@media (min-width: 992px) {
+  html { font-size: 14px; }
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 200, 83, 0.4);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* 通用面板毛玻璃 */
+.h2-panel {
+  background: linear-gradient(160deg, rgba(10, 60, 35, 0.85), rgba(5, 40, 25, 0.85));
+  border: 1px solid rgba(105, 240, 174, 0.18);
+  border-radius: 12px;
+  backdrop-filter: blur(6px);
+}
+
+.h2-glow-text {
+  text-shadow: 0 0 12px rgba(105, 240, 174, 0.6);
+}
+
+.h2-num {
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+}
+
+.h2-cursor::after {
+  content: '|';
+  color: #69F0AE;
+  animation: h2-blink 1s steps(2) infinite;
+}
+@keyframes h2-blink {
+  0%, 50% { opacity: 1; }
+  51%, 100% { opacity: 0; }
+}
+
+/* KPI 卡片 */
+.h2-kpi-card {
+  background: linear-gradient(135deg, rgba(0, 200, 83, 0.08), rgba(0, 229, 255, 0.05));
+  border: 1px solid rgba(105, 240, 174, 0.2);
+  border-radius: 12px;
+  padding: 16px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.h2-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 16px rgba(0, 200, 83, 0.15);
+}
+
+/* 状态标签颜色 */
+.h2-status-online { color: #69F0AE; }
+.h2-status-transit { color: #00E5FF; }
+.h2-status-refuel { color: #FFD740; }
+.h2-status-warning { color: #FF6B35; }
+.h2-status-offline { color: #6B7280; }
