@@ -1,0 +1,43 @@
+name: ModelScope Studio Keepalive
+
+on:
+  schedule:
+    # Every 5 minutes
+    - cron: '*/5 * * * *'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  keepalive:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping ModelScope Studio Page
+        run: |
+          echo "[$(date -u)] Pinging ModelScope Studio page..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://www.modelscope.cn/studios/gsym236998/h2brain")
+          echo "ModelScope page HTTP code: $HTTP_CODE"
+
+      - name: Wait for container warmup
+        run: sleep 10
+
+      - name: Ping Direct URL
+        run: |
+          echo "[$(date -u)] Pinging direct URL..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://gsym236998-h2brain.ms.show")
+          echo "Direct URL HTTP code: $HTTP_CODE"
+          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
+            echo "Container is alive!"
+          else
+            echo "Container returned $HTTP_CODE, may need manual restart"
+          fi
+
+      - name: Ping API Health Endpoint
+        run: |
+          echo "[$(date -u)] Pinging API endpoint..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://gsym236998-h2brain.ms.show/api/operations")
+          echo "API endpoint HTTP code: $HTTP_CODE"
+
+      - name: Summary
+        run: |
+          echo "=== Keepalive Summary ==="
+          echo "Time: $(date -u)"
+          echo "All pings completed."
