@@ -1,0 +1,24 @@
+version: "3.8"
+
+services:
+  backend:
+    build: ./backend
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_NAME=氢智行 H2Brain
+      - APP_ENV=production
+      - DEBUG=false
+      - LLM_API_KEY=${LLM_API_KEY:-}
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.openai.com/v1}
+      - LLM_MODEL=${LLM_MODEL:-gpt-4o-mini}
+      - CORS_ORIGINS=["http://localhost","http://localhost:5173"]
+    restart: unless-stopped
+
+  frontend:
+    build: ./frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    restart: unless-stopped

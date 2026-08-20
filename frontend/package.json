@@ -1,0 +1,37 @@
+{
+  "name": "h2brain-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@ant-design/icons": "^6.2.5",
+    "antd": "^6.4.5",
+    "axios": "^1.18.1",
+    "dayjs": "^1.11.21",
+    "echarts": "^6.1.0",
+    "echarts-for-react": "^3.0.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.18.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/node": "^24.12.3",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^10.3.0",
+    "globals": "^17.6.0",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^3.4.19",
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12"
+  }
+}

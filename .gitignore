@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+.env.local
+dist/
+*.egg-info/
+.DS_Store
+tsconfig.tsbuildinfo
