@@ -41,7 +41,11 @@ COPY deploy/modelscope/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 ENV APP_ENV=production
 ENV DEBUG=false
 ENV LLM_ENABLED=false
-ENV CORS_ORIGINS=["*"]
+
+# Overwrite .env with production values (avoid local dev .env leaking into container)
+RUN echo 'APP_ENV=production' > /app/backend/.env && \
+    echo 'DEBUG=false' >> /app/backend/.env && \
+    echo 'CORS_ORIGINS=["*"]' >> /app/backend/.env
 
 EXPOSE 7860
 
