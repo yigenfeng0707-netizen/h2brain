@@ -10,34 +10,36 @@ jobs:
   keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping ModelScope Studio Page
+      - name: Ping ModelScope Studio
+        env:
+          UA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         run: |
-          echo "[$(date -u)] Pinging ModelScope Studio page..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://www.modelscope.cn/studios/gsym236998/h2brain")
-          echo "ModelScope page HTTP code: $HTTP_CODE"
+          echo "=== Keepalive $(date -u) ==="
 
-      - name: Wait for container warmup
-        run: sleep 10
+          # 1. Ping ModelScope Studio page (trigger container start if sleeping)
+          PAGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "User-Agent: $UA" \
+            "https://www.modelscope.cn/studios/gsym236998/h2brain")
+          echo "ModelScope page: $PAGE_CODE"
 
-      - name: Ping Direct URL
-        run: |
-          echo "[$(date -u)] Pinging direct URL..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://gsym236998-h2brain.ms.show")
-          echo "Direct URL HTTP code: $HTTP_CODE"
-          if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "302" ] || [ "$HTTP_CODE" = "301" ]; then
-            echo "Container is alive!"
+          # 2. Wait for container warmup
+          sleep 5
+
+          # 3. Ping direct URL (keep container alive)
+          DIRECT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "User-Agent: $UA" \
+            "https://gsym236998-h2brain.ms.show")
+          echo "Direct URL: $DIRECT_CODE"
+
+          # 4. Ping API endpoint (keep backend alive)
+          API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
+            -H "User-Agent: $UA" \
+            "https://gsym236998-h2brain.ms.show/api/operations")
+          echo "API endpoint: $API_CODE"
+
+          # 5. Summary
+          if [ "$DIRECT_CODE" = "200" ]; then
+            echo "✅ Container is alive"
           else
-            echo "Container returned $HTTP_CODE, may need manual restart"
+            echo "⚠️ Direct URL returned $DIRECT_CODE"
           fi
-
-      - name: Ping API Health Endpoint
-        run: |
-          echo "[$(date -u)] Pinging API endpoint..."
-          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 "https://gsym236998-h2brain.ms.show/api/operations")
-          echo "API endpoint HTTP code: $HTTP_CODE"
-
-      - name: Summary
-        run: |
-          echo "=== Keepalive Summary ==="
-          echo "Time: $(date -u)"
-          echo "All pings completed."
