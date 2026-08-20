@@ -1,0 +1,16 @@
+services:
+  - type: web
+    name: h2brain-api
+    runtime: python
+    rootDir: backend
+    installCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.0
+      - key: APP_ENV
+        value: production
+      - key: LLM_ENABLED
+        value: "false"
+      - key: CORS_ORIGINS
+        value: "*"
