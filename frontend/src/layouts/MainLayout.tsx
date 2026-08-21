@@ -21,6 +21,7 @@ const NAV_ITEMS = [
   { key: '/architecture', label: '五层架构', icon: '#' },
   { key: '/case', label: '案例数据看板', icon: '+' },
   { key: '/pricing', label: 'SaaS 定价', icon: '$' },
+  { key: '/trip-analysis', label: '行程分析 Dashboard', icon: '~' },
 ]
 
 function renderMenu(selectedKey: string, onNavigate: (key: string) => void) {

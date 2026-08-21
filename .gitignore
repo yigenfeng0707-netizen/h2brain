@@ -31,3 +31,8 @@ Thumbs.db
 # Data
 *.sqlite3
 *.db
+.cache/
+*.pkl
+
+# Build artifacts
+frontend/tsconfig.tsbuildinfo

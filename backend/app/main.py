@@ -4,13 +4,14 @@
 Phase 1 提供：健康检查、运营数据、智能调度、ReAct决策推理、智能体展示。
 """
 
+import json
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import health, operations, dispatch, react, agents, display
+from app.api import health, operations, dispatch, react, agents, display, analysis
 
 API_PREFIX = "/api/v1"
 
@@ -25,7 +26,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="氢智行 H2Brain API",
     description="氢能车辆运营智能分析与决策平台",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
     docs_url="/docs",
     openapi_url="/openapi.json",
@@ -46,6 +47,7 @@ app.include_router(dispatch.router, prefix=API_PREFIX, tags=["智能调度"])
 app.include_router(react.router, prefix=API_PREFIX, tags=["ReAct决策"])
 app.include_router(agents.router, prefix=API_PREFIX, tags=["智能体"])
 app.include_router(display.router, prefix=API_PREFIX, tags=["展示"])
+app.include_router(analysis.router, prefix=API_PREFIX, tags=["真实数据分析"])
 
 
 @app.get("/", tags=["根"])

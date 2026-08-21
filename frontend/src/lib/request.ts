@@ -26,9 +26,19 @@ export const apiGet = {
   displayArchitecture: () => api.get('/display/architecture'),
   displayCase: () => api.get('/display/case'),
   displayPricing: () => api.get('/display/pricing'),
+  // 真实数据分析
+  analysisVehicles: () => api.get('/analysis/vehicles'),
+  analysisTrips: (vehicleId: string) => api.get(`/analysis/trips/${vehicleId}`),
+  analysisTripDetail: (vehicleId: string, tripId: number) =>
+    api.get(`/analysis/trip/${vehicleId}/${tripId}`, { timeout: 30000 }),
+  analysisBenchmark: (vehicleId: string) => api.get(`/analysis/benchmark/${vehicleId}`),
+  analysisReport: (vehicleId: string, tripId: number) =>
+    api.get(`/analysis/report/${vehicleId}/${tripId}`, { timeout: 30000 }),
 }
 
 export const apiPost = {
   react: (data: { scenario: string; query: string; vehicle_plate?: string }) =>
     api.post('/react', data),
+  analysisUpload: (data: FormData) =>
+    api.post('/analysis/upload', data, { timeout: 120000 }),
 }

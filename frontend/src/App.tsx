@@ -9,6 +9,7 @@ import ReactPanel from '@/pages/ReactPanel'
 import Architecture from '@/pages/Architecture'
 import CaseDashboard from '@/pages/CaseDashboard'
 import SaaSPricing from '@/pages/SaaSPricing'
+import TripAnalysis from '@/pages/TripAnalysis'
 import HydrogenOptAgent from '@/pages/agents/HydrogenOptAgent'
 import RouteAgent from '@/pages/agents/RouteAgent'
 import StationAgent from '@/pages/agents/StationAgent'
@@ -45,6 +46,7 @@ export default function App() {
             <Route path="/architecture" element={<Architecture />} />
             <Route path="/case" element={<CaseDashboard />} />
             <Route path="/pricing" element={<SaaSPricing />} />
+            <Route path="/trip-analysis" element={<TripAnalysis />} />
           </Route>
         </Routes>
       </BrowserRouter>
