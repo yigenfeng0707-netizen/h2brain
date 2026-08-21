@@ -35,12 +35,12 @@ CACHE_DIR.mkdir(exist_ok=True)
 VEHICLE_FILES = {
     "V1": {
         "label": "测试车辆1#",
-        "file": "测试车辆1#车辆数据.csv",
+        "file": "测试车辆1#车辆数据.parquet",
         "region": "湖北襄阳",
     },
     "V2": {
         "label": "测试车辆2#",
-        "file": "测试车辆2#车辆数据.csv",
+        "file": "测试车辆2#车辆数据.parquet",
         "region": "新疆吐鲁番",
     },
 }
@@ -126,8 +126,11 @@ MODE_COLORS = {
 
 
 def _load_and_convert(filepath: str, vehicle_id: str) -> pd.DataFrame:
-    """Load CSV and apply conversion formulas."""
-    df = pd.read_csv(filepath, usecols=COLUMNS, encoding="utf-8-sig")
+    """Load data file (parquet or CSV) and apply conversion formulas."""
+    if filepath.endswith(".parquet"):
+        df = pd.read_parquet(filepath)
+    else:
+        df = pd.read_csv(filepath, usecols=COLUMNS, encoding="utf-8-sig")
 
     # Parse timestamp
     df["timestamp"] = pd.to_datetime(df["time_数据采集时间"], format="mixed")
