@@ -6,13 +6,18 @@ uvicorn[standard]>=0.34.0
 pydantic>=2.12.5
 pydantic-settings>=2.7.1
 python-dotenv>=1.0.1
+python-multipart>=0.0.20
 
 # LLM / Agent
 openai==1.59.3
 httpx==0.28.1
 
-# Data
-numpy==2.2.1
+# Data processing
+pandas>=2.2.0
+numpy>=2.2.1
+scipy>=1.14.0
+
+# Mock data (legacy)
 faker==33.3.1
 
 # Monitoring

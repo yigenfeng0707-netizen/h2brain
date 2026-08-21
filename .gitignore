@@ -33,6 +33,7 @@ Thumbs.db
 *.db
 .cache/
 *.pkl
+backend/data/
 
 # Build artifacts
 frontend/tsconfig.tsbuildinfo

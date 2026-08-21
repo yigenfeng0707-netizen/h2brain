@@ -7,6 +7,7 @@ segments trips, classifies road conditions, detects power modes and load changes
 from __future__ import annotations
 
 import json
+import os
 import pickle
 from datetime import datetime
 from pathlib import Path
@@ -20,9 +21,13 @@ import pandas as pd
 # ---------------------------------------------------------------------------
 
 DATA_DIR = (
-    Path(__file__).resolve().parent.parent.parent.parent
-    / "T05_数据包"
-    / "T05_氢能车辆运营智能分析与决策助手数据包"
+    Path(os.environ.get("H2BRAIN_DATA_DIR", ""))
+    if os.environ.get("H2BRAIN_DATA_DIR")
+    else (
+        Path(__file__).resolve().parent.parent.parent.parent
+        / "T05_数据包"
+        / "T05_氢能车辆运营智能分析与决策助手数据包"
+    )
 )
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / ".cache"
 CACHE_DIR.mkdir(exist_ok=True)

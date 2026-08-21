@@ -26,6 +26,9 @@ RUN pip install --no-cache-dir -r requirements.txt -i https://mirrors.tuna.tsing
 
 COPY backend/ .
 
+# Copy pre-processed data files (only needed columns, ~70MB total)
+COPY backend/data/ /app/data/
+
 # Setup frontend
 RUN rm -rf /usr/share/nginx/html/*
 COPY --from=frontend-builder /frontend/dist /usr/share/nginx/html
@@ -41,6 +44,7 @@ COPY deploy/modelscope/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 ENV APP_ENV=production
 ENV DEBUG=false
 ENV LLM_ENABLED=false
+ENV H2BRAIN_DATA_DIR=/app/data
 
 # Overwrite .env with production values (avoid local dev .env leaking into container)
 RUN echo 'APP_ENV=production' > /app/backend/.env && \
