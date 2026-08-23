@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; line-height: 1.8; color: #333; }
+h1 { font-size: 28px; font-weight: 700; margin: 24px 0 16px; color: #1a1a1a; }
+h2 { font-size: 22px; font-weight: 600; margin: 20px 0 12px; color: #2a2a2a; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+h3 { font-size: 18px; font-weight: 600; margin: 16px 0 8px; color: #333; }
+p { margin: 8px 0; }
+table { border-collapse: collapse; width: 100%; margin: 12px 0; }
+th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+th { background: #f5f7fa; font-weight: 600; }
+tr:nth-child(even) { background: #fafafa; }
+code { background: #f5f7fa; padding: 2px 6px; border-radius: 3px; font-family: "SF Mono", Monaco, Consolas, monospace; font-size: 14px; }
+pre { background: #f5f7fa; padding: 16px; border-radius: 6px; overflow-x: auto; }
+pre code { background: none; padding: 0; }
+blockquote { border-left: 4px solid #4CAF50; margin: 12px 0; padding: 8px 16px; background: #f9fff9; color: #555; }
+ul, ol { margin: 8px 0; padding-left: 24px; }
+li { margin: 4px 0; }
+strong { font-weight: 600; }
+hr { border: none; border-top: 1px solid #eee; margin: 24px 0; }
+</style>
+</head>
+<body>
+<h1>氢智行 H2Brain — 项目介绍飞书文档</h1>
+<blockquote>
+<p>2026 浦发·IGNITE 未来能源黑客松大赛 | T05 氢能车辆运营智能分析与决策</p>
+</blockquote>
+<hr />
+<h2>第1页：背景与真实问题</h2>
+<h3>行业背景</h3>
+<p>氢能重卡是交通领域脱碳的关键路径。北京大兴国际氢能示范区作为国家级氢能产业集聚区，已聚集数十家氢能产业链企业，形成了从制氢、储氢、运氢到用氢的完整产业生态。氢能重卡在实际运营中，单车氢气成本占运营总成本的40%以上，远高于柴油车的燃油占比（约25%），因此运营效率的每一点提升都意味着真金白银的节约。</p>
+<h3>四大真实痛点</h3>
+<table>
+<thead>
+<tr>
+<th>痛点</th>
+<th>现状</th>
+<th>影响</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>氢耗高且波动大</strong></td>
+<td>百公里氢耗8-13kg，同型号车辆差异可达60%</td>
+<td>氢气单价30-36元/kg，每多1kg/百公里等于每百公里多花30-36元</td>
+</tr>
+<tr>
+<td><strong>加氢难</strong></td>
+<td>全国仅约400座加氢站，大兴示范区周边仅5座</td>
+<td>单次加氢排队等待平均22分钟，高峰期可达45分钟</td>
+</tr>
+<tr>
+<td><strong>成本不透明</strong></td>
+<td>氢能/维保/人工/折旧成本缺乏精细核算</td>
+<td>车队管理者无法识别成本异常，难以针对性优化</td>
+</tr>
+<tr>
+<td><strong>燃料电池衰减不可见</strong></td>
+<td>电堆健康状态无实时评估手段</td>
+<td>衰减到临界点才报警，维保被动，寿命缩短</td>
+</tr>
+</tbody>
+</table>
+<h3>数据来源</h3>
+<p>本项目的模拟数据基于大兴氢能示范区真实场景参数：加氢站坐标、氢气价格（30-36元/kg）、氢能重卡型号（福田智蓝H2-31T、飞驰FSQ-18T、大运氢能-25T、解放J7氢能版）均来自公开产业数据。</p>
+<hr />
+<h2>第2页：目标用户</h2>
+<h3>核心用户画像</h3>
+<table>
+<thead>
+<tr>
+<th>用户角色</th>
+<th>核心需求</th>
+<th>使用场景</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>氢能车队运营经理</strong></td>
+<td>降低全队运营成本，提高车辆利用率</td>
+<td>日常调度、月度成本分析、运力规划</td>
+</tr>
+<tr>
+<td><strong>氢能车辆调度员</strong></td>
+<td>快速匹配订单与车辆，规划最优路线</td>
+<td>实时调度大屏、订单派发</td>
+</tr>
+<tr>
+<td><strong>加氢站运营方</strong></td>
+<td>均衡加氢站负载，减少排队拥堵</td>
+<td>加氢站监控、分流调度</td>
+</tr>
+<tr>
+<td><strong>氢能车辆司机</strong></td>
+<td>获取最优行驶参数和加氢建议</td>
+<td>车载终端/移动App</td>
+</tr>
+</tbody>
+</table>
+<h3>市场规模</h3>
+<ul>
+<li>2025年全国氢能重卡保有量约5,000辆，预计2030年达到50,000辆</li>
+<li>氢能重卡运营管理SaaS市场潜在规模：50,000辆 x 2,000元/月/车 = 12亿元/年</li>
+<li>大兴示范区及周边氢能车辆：当前约300辆，3年内预计突破2,000辆</li>
+</ul>
+<hr />
+<h2>第3页：解决方案</h2>
+<h3>核心理念</h3>
+<blockquote>
+<p><strong>让每克氢都跑在刀刃上</strong></p>
+</blockquote>
+<p>氢智行 H2Brain 通过六大智能体协同，覆盖"氢-站-车-路-人-成本"全链路运营场景，将港口集卡智能调度的成熟经验迁移至氢能车辆场景。</p>
+<h3>六大智能体总览</h3>
+<pre><code>                    H2Brain 总控Agent
+                         |
+    +------+------+------+------+------+
+    |      |      |      |      |      |
+  氢耗   路径   加氢站  车队   成本   燃料电池
+  优化   规划   调度   管理   分析   健康
+</code></pre>
+<h3>技术架构（五层）</h3>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>名称</th>
+<th>内容</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>L5</td>
+<td>用户接入层</td>
+<td>车队管理Web端 / 司机App / 加氢站终端 / 氢能监管平台</td>
+</tr>
+<tr>
+<td>L4</td>
+<td>智能体服务层</td>
+<td>六大氢能智能体协同 + 总控Agent任务编排</td>
+</tr>
+<tr>
+<td>L3</td>
+<td>数据与检索层</td>
+<td>氢能垂直知识库 / 车辆数字孪生 / 实时运力池</td>
+</tr>
+<tr>
+<td>L2</td>
+<td>核心技术层</td>
+<td>LLM / RAG / MCP协议 / 运筹优化(OR-Tools) / LSTM</td>
+</tr>
+<tr>
+<td>L1</td>
+<td>基础设施层</td>
+<td>氢能示范区私有云 / 百车级并发 / 等保二级</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>第4页：核心功能 — 智能体详解（上）</h2>
+<h3>1. 氢耗优化 Agent (hydrogen_opt)</h3>
+<p><strong>功能</strong>：实时监控每辆车的氢耗，基于载重、路况、天气、驾驶行为推荐最优行驶参数。</p>
+<p><strong>技术实现</strong>：<br />
+- 构建氢耗预测模型：氢耗 = f(载重, 速度, 温度, 坡度, 驾驶行为评分)<br />
+- 基于LSTM时序预测未来30分钟氢耗趋势<br />
+- LLM生成自然语言优化建议</p>
+<p><strong>关键指标</strong>：百公里氢耗降低12%（从平均9.6kg降至8.4kg）</p>
+<p><strong>示例输出</strong>：</p>
+<blockquote>
+<p>京A-H2308 当前百公里氢耗11.2kg，高于车队均值9.6kg。主要原因：瞬时加速频率高于均值35%，建议将巡航速度从75km/h降至68km/h，预计氢耗降至9.8kg/百公里，本趟可节约氢气成本约86元。</p>
+</blockquote>
+<h3>2. 路径规划 Agent (route_plan)</h3>
+<p><strong>功能</strong>：融合加氢站分布、剩余氢量、订单目的地，规划最优运输路线。</p>
+<p><strong>技术实现</strong>：<br />
+- 基于OR-Tools求解带加氢约束的车辆路径问题（VRP with Refueling Constraints）<br />
+- 续航圈计算：基于剩余氢量和历史氢耗，计算车辆可达范围<br />
+- 多站路径择优：对比2-3条候选路线的氢耗、时间、成本</p>
+<p><strong>关键指标</strong>：续航匹配率98%+</p>
+<p><strong>核心创新</strong>：首次将加氢站约束纳入车辆路径规划。传统VRP假设加油站充足，而氢能场景中加氢站稀少（全国仅约400座），必须将加氢站位置和氢气库存作为硬约束。</p>
+<h3>3. 加氢站调度 Agent (station_dispatch)</h3>
+<p><strong>功能</strong>：实时监控各加氢站排队情况，智能分流车辆到最优加氢站。</p>
+<p><strong>技术实现</strong>：<br />
+- 排队论模型（M/M/c）预测各站等待时间<br />
+- 强化学习动态分流策略<br />
+- 氢价对比：不同加氢站价格差异可达4元/kg</p>
+<p><strong>关键指标</strong>：等待时间降低60%（从平均22分钟降至9分钟）</p>
+<hr />
+<h2>第5页：核心功能 — 智能体详解（下）</h2>
+<h3>4. 车队管理 Agent (fleet_manage)</h3>
+<p><strong>功能</strong>：全车队运力统一调度，订单-车辆智能匹配，司机排班优化。</p>
+<p><strong>技术实现</strong>：<br />
+- 多目标优化：同时最小化空驶率、氢耗成本、延误率<br />
+- 车队长画像：基于历史订单数据分析各车队运营特征<br />
+- MCP协议实现跨系统协同</p>
+<p><strong>关键指标</strong>：利用率提升25%</p>
+<h3>5. 成本分析 Agent (cost_analysis)</h3>
+<p><strong>功能</strong>：全成本核算 + TCO对标 + 成本归因分析。</p>
+<p><strong>技术实现</strong>：<br />
+- 全成本模型：氢能成本 + 维保成本 + 人工成本 + 折旧 + 保险 + 路桥费<br />
+- TCO对标：与柴油重卡进行全生命周期成本对比<br />
+- LLM成本异常归因：自动识别成本异常原因并给出优化路径</p>
+<p><strong>关键指标</strong>：运营成本降低18%</p>
+<p><strong>成本结构示例</strong>：<br />
+| 成本项 | 占比 | 优化空间 |<br />
+|--------|------|---------|<br />
+| 氢能 | 42% | 高（氢耗优化+加氢站择优） |<br />
+| 维保 | 18% | 中（燃料电池健康预测） |<br />
+| 人工 | 15% | 低 |<br />
+| 折旧 | 20% | 低 |<br />
+| 其他 | 5% | - |</p>
+<h3>6. 燃料电池健康 Agent (fuelcell_health)</h3>
+<p><strong>功能</strong>：预测燃料电池电堆衰减，提前推荐维保方案。</p>
+<p><strong>技术实现</strong>：<br />
+- 基于电压衰减曲线的LSTM衰减预测模型<br />
+- 健康状态分级：优秀(&gt;90%) / 良好(80-90%) / 关注(70-80%) / 预警(&lt;70%)<br />
+- RAG检索维保知识库，生成维保建议</p>
+<p><strong>关键指标</strong>：寿命预测准确率95%+</p>
+<hr />
+<h2>第6页：Demo展示</h2>
+<h3>在线Demo</h3>
+<ul>
+<li><strong>访问地址</strong>：[部署后填写]</li>
+<li><strong>体验方式</strong>：直接访问，无需登录</li>
+<li><strong>建议体验路径</strong>：<br />
+  1. 进入运营总览大屏，查看车队KPI（15辆车、5个加氢站、33个订单）<br />
+  2. 进入智能调度页面，查看车辆实时位置和订单派发推荐<br />
+  3. 进入ReAct决策面板，选择"氢耗优化"场景，输入问题，查看AI推理过程<br />
+  4. 进入各智能体详情页，查看每个Agent的专项分析<br />
+  5. 进入架构展示页，了解系统五层架构设计<br />
+  6. 进入案例看板，查看实际运营效果数据<br />
+  7. 进入SaaS定价页，了解商业模式</li>
+</ul>
+<h3>Demo核心亮点</h3>
+<ol>
+<li><strong>运营总览大屏</strong>：15辆氢能重卡实时状态、车队KPI、氢耗趋势图、加氢站状态</li>
+<li><strong>ReAct决策推理</strong>：输入自然语言问题，AI通过Thought-Action-Observation链式推理输出可执行建议</li>
+<li><strong>六大一智能体</strong>：每个Agent独立详情页，展示专项分析和关键指标</li>
+</ol>
+<hr />
+<h2>第7页：技术实现</h2>
+<h3>技术栈</h3>
+<table>
+<thead>
+<tr>
+<th>层级</th>
+<th>技术选型</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>前端</td>
+<td>React 19 + TypeScript + Vite 8</td>
+<td>SPA单页应用</td>
+</tr>
+<tr>
+<td>UI组件</td>
+<td>Ant Design 6 + ECharts 6</td>
+<td>暗色主题，绿色主色调</td>
+</tr>
+<tr>
+<td>后端</td>
+<td>FastAPI + Pydantic + NumPy</td>
+<td>Python异步API</td>
+</tr>
+<tr>
+<td>架构</td>
+<td>LLM + RAG + MCP + OR-Tools</td>
+<td>多智能体协同</td>
+</tr>
+<tr>
+<td>部署</td>
+<td>Docker Compose / Vercel + Render</td>
+<td>前后端分离</td>
+</tr>
+</tbody>
+</table>
+<h3>ReAct决策推理引擎</h3>
+<pre><code>用户提问 → 场景识别 → Thought(分析问题) → Action(调用工具) → Observation(获取结果) → 输出建议
+</code></pre>
+<p>支持五类决策场景：氢耗优化、路径规划、加氢站调度、成本分析、车队管理。</p>
+<h3>数据模型</h3>
+<ul>
+<li>15辆氢能重卡（4种型号，4个车队，10个司机）</li>
+<li>5个加氢站（大兴周边真实坐标，氢价30-36元/kg）</li>
+<li>33个运输订单（5种货物类型，3种状态）</li>
+<li>燃料电池健康数据（衰减曲线模拟）</li>
+</ul>
+<h3>代码仓库</h3>
+<p>GitHub: [部署后填写]</p>
+<hr />
+<h2>第8页：创新点</h2>
+<h3>1. 首次将加氢站约束纳入车辆路径规划</h3>
+<p>传统VRP假设加油站充足，不构成路径约束。氢能场景中加氢站稀少（全国仅约400座，柴油加油站超10万座），必须将加氢站位置、氢气库存、排队时间作为硬约束纳入路径优化。</p>
+<h3>2. 多智能体协同的全链路优化</h3>
+<p>不是单点AI应用，而是六个智能体协同覆盖"氢-站-车-路-人-成本"全链路。例如：路径规划Agent发现需要加氢 → 触发加氢站调度Agent推荐最优站点 → 同时通知成本分析Agent预估加氢成本 → 氢耗优化Agent调整行驶参数以延长续航。</p>
+<h3>3. ReAct推理引擎输出可执行建议</h3>
+<p>不同于简单的数据可视化或LLM对话，ReAct引擎通过Thought-Action-Observation链式推理，输出结构化的可执行建议（具体到速度调整值、推荐加氢站、预计节约金额）。</p>
+<h3>4. 港口集卡经验迁移</h3>
+<p>团队将港口集卡智能调度平台（LogiBrain）的成熟运筹优化经验迁移至氢能场景。LogiBrain已实现空驶率降低15-20%、年节约5-8万/车、98.7%追踪精度的可验证成果，核心调度算法和异常检测框架直接复用。</p>
+<h3>5. 氢耗预测模型</h3>
+<p>基于载重、速度、温度、坡度、驾驶行为五因子构建氢耗预测模型，填补了氢能重卡能耗优化领域的空白。</p>
+<hr />
+<h2>第9页：应用价值</h2>
+<h3>经济价值</h3>
+<table>
+<thead>
+<tr>
+<th>指标</th>
+<th>当前水平</th>
+<th>H2Brain优化后</th>
+<th>改善幅度</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>百公里氢耗</td>
+<td>9.6kg</td>
+<td>8.4kg</td>
+<td>-12%</td>
+</tr>
+<tr>
+<td>加氢等待时间</td>
+<td>22分钟</td>
+<td>9分钟</td>
+<td>-60%</td>
+</tr>
+<tr>
+<td>车辆利用率</td>
+<td>65%</td>
+<td>81%</td>
+<td>+25%</td>
+</tr>
+<tr>
+<td>运营成本</td>
+<td>基准</td>
+<td>基准-18%</td>
+<td>-18%</td>
+</tr>
+<tr>
+<td>燃料电池寿命</td>
+<td>基准</td>
+<td>+15%</td>
+<td>延长</td>
+</tr>
+</tbody>
+</table>
+<h3>环境价值</h3>
+<ul>
+<li>单车年碳减排：氢能重卡相比柴油重卡，每百公里减排约80kg CO2</li>
+<li>15辆车队年碳减排：约282吨 CO2/年</li>
+</ul>
+<h3>商业模式</h3>
+<table>
+<thead>
+<tr>
+<th>收入来源</th>
+<th>占比</th>
+<th>说明</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>SaaS订阅</td>
+<td>60%</td>
+<td>2,000元/月/车，含六大智能体全部功能</td>
+</tr>
+<tr>
+<td>实施服务</td>
+<td>25%</td>
+<td>系统部署+数据接入+培训</td>
+</tr>
+<tr>
+<td>运力协同增值</td>
+<td>15%</td>
+<td>跨车队调度+加氢站合作分成</td>
+</tr>
+</tbody>
+</table>
+<h3>落地路径</h3>
+<ol>
+<li><strong>第一阶段</strong>（黑客松Demo）：基于模拟数据验证六大智能体功能完整性</li>
+<li><strong>第二阶段</strong>（3个月）：接入大兴示范区1-2个试点车队真实数据</li>
+<li><strong>第三阶段</strong>（6-12个月）：扩展至大兴全域300辆氢能重卡，形成可复制方案</li>
+</ol>
+<hr />
+<h2>第10页：团队信息</h2>
+<h3>团队成员</h3>
+<table>
+<thead>
+<tr>
+<th>角色</th>
+<th>姓名</th>
+<th>背景</th>
+<th>分工</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>队长/全栈开发</td>
+<td>冯亦根</td>
+<td>港口集卡运力智能调度平台LogiBrain创始人，浦东明珠杯参赛者</td>
+<td>架构设计+前后端开发+ReAct引擎</td>
+</tr>
+<tr>
+<td>技术顾问</td>
+<td>[待补充]</td>
+<td>[待补充]</td>
+<td>[待补充]</td>
+</tr>
+</tbody>
+</table>
+<h3>相关经验</h3>
+<ul>
+<li><strong>物流超脑 LogiBrain</strong>：基于多智能体协同的港口集卡运力智能调度平台，已实现空驶率-15~20%、单车月均1.2万公里+、年节约5-8万/车、98.7%追踪精度</li>
+<li><strong>浦东明珠杯</strong>：人工智能赛道参赛项目，冲击一等奖</li>
+<li><strong>技术积累</strong>：LLM + RAG + MCP + RPA多智能体协同全栈融合，5项软著+2项专利申请中</li>
+</ul>
+<h3>联系方式</h3>
+<ul>
+<li>队长：冯亦根 18969081266 / 18969081266@189.cn</li>
+</ul>
+</body>
+</html>

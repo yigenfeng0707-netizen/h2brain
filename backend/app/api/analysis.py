@@ -15,6 +15,8 @@ from fastapi import APIRouter, HTTPException, UploadFile, File
 from fastapi.responses import Response
 
 from ..data_processor import get_processor
+from ..value_analysis import compute_value_analysis
+from ..validation import validate_trip_segmentation
 
 router = APIRouter()
 
@@ -108,5 +110,61 @@ async def analysis_upload(file: UploadFile = File(...)):
         return _json_response(result)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
-    finally:
-        os.unlink(tmp_path)
+
+
+@router.get("/analysis/thresholds", tags=["真实数据分析"])
+def get_thresholds():
+    """获取当前阈值配置"""
+    processor = get_processor()
+    return _json_response(processor.get_thresholds())
+
+
+@router.post("/analysis/thresholds/calibrate", tags=["真实数据分析"])
+def calibrate_thresholds():
+    """基于实际遥测数据标定阈值参数"""
+    processor = get_processor()
+    result = processor.calibrate_thresholds()
+
+    # Apply calibrated thresholds
+    if result.get("calibrated"):
+        processor.apply_calibrated_thresholds(result["calibrated"])
+
+    return _json_response(
+        {
+            "status": "ok",
+            "calibrated": result.get("calibrated", {}),
+            "report": result.get("report", ""),
+            "stats": result.get("stats", {}),
+            "current_thresholds": processor.get_thresholds(),
+        }
+    )
+
+
+@router.get("/analysis/value", tags=["真实数据分析"])
+def get_value_analysis():
+    """Compute economic benefits and emission reduction from real fleet data."""
+    processor = get_processor()
+    vehicles = processor.get_vehicles()
+    all_trips = []
+    for v in vehicles:
+        vid = v.get("vehicle_id")
+        if vid:
+            all_trips.extend(processor.get_trips(vid))
+    result = compute_value_analysis(vehicles, all_trips)
+    return _json_response(result)
+
+
+@router.get("/analysis/validation", tags=["真实数据分析"])
+def get_validation_report(vehicle_id: str = "V2"):
+    """Validate automatic trip segmentation against manual ground-truth records.
+
+    Compares algorithm output with the official manual record spreadsheet
+    ("测试车辆2#手工行程及工况记录表.xlsx") provided in the T05 data package.
+    Reports trip count match, mileage deviation, per-trip MAPE, and work-condition
+    classification agreement rate.
+    """
+    try:
+        result = validate_trip_segmentation(vehicle_id)
+        return _json_response(result)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")

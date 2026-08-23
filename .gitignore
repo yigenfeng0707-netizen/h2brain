@@ -37,3 +37,6 @@ backend/data/*.csv
 
 # Build artifacts
 frontend/tsconfig.tsbuildinfo
+
+# Video production assets
+video_assets/

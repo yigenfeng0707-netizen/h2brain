@@ -1,107 +1,204 @@
-"""氢智行 H2Brain - 智能体展示接口"""
+"""H2Brain - Agent Display & Execution API
 
-from fastapi import APIRouter
+Provides six hydrogen-energy intelligent agents:
+- Static metadata for display
+- Execution endpoint that routes to the ReAct engine
+"""
+
+from __future__ import annotations
+
+import logging
+
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel, Field
+
+from ..config import settings
+from ..schemas import ReactRequest
+
+logger = logging.getLogger("h2brain.api.agents")
 
 router = APIRouter()
 
 AGENTS_DATA = [
     {
         "key": "hydrogen_opt",
-        "name": "氢耗优化 Agent",
+        "name": "Hydrogen Consumption Optimization Agent",
         "icon": "h2",
-        "metric": "百公里氢耗 -12%",
-        "desc": "基于车辆载重、路况、天气、驾驶行为多维度分析，实时推荐最优行驶参数，降低百公里氢耗。",
+        "metric": "Consumption -12% per 100km",
+        "desc": "Multi-dimensional analysis based on vehicle load, road conditions, weather, and driving behavior to recommend optimal driving parameters and reduce hydrogen consumption per 100km.",
         "capabilities": [
-            "实时氢耗监控与异常检测",
-            "基于路况的行驶速度优化建议",
-            "驾驶行为评分与节能指导",
-            "历史氢耗趋势分析与对标",
+            "Real-time consumption monitoring and anomaly detection",
+            "Road-condition-based speed optimization recommendations",
+            "Driving behavior scoring and energy-saving guidance",
+            "Historical consumption trend analysis and benchmarking",
         ],
-        "tech": "LLM + RAG + 时序预测",
+        "tech": "LLM + RAG + Time Series Prediction",
+        "scenario": "hydrogen_optimization",
     },
     {
         "key": "route_plan",
-        "name": "路径规划 Agent",
+        "name": "Route Planning Agent",
         "icon": "route",
-        "metric": "续航匹配率 98%+",
-        "desc": "融合加氢站分布、车辆剩余氢量、订单目的地，智能规划最优运输路线，确保不断氢。",
+        "metric": "Range matching rate 98%+",
+        "desc": "Integrates refueling station distribution, remaining hydrogen, and order destinations to plan optimal transport routes ensuring vehicles never run out of hydrogen.",
         "capabilities": [
-            "基于氢量的安全续航圈计算",
-            "多加氢站路径择优",
-            "实时路况与拥堵避让",
-            "多订单串联路径优化",
+            "Safety range circle calculation based on hydrogen level",
+            "Multi-station route optimization",
+            "Real-time traffic and congestion avoidance",
+            "Multi-order串联 route optimization",
         ],
-        "tech": "图搜索 + OR-Tools + 高德API",
+        "tech": "Haversine Distance + Range Circle + Multi-station Optimization",
+        "scenario": "route_planning",
     },
     {
         "key": "station_dispatch",
-        "name": "加氢站调度 Agent",
+        "name": "Station Dispatch Agent",
         "icon": "station",
-        "metric": "等待时间 -60%",
-        "desc": "实时监控各加氢站排队情况，智能分配车辆到最优加氢站，减少等待时间。",
+        "metric": "Wait time -60%",
+        "desc": "Monitors real-time station queues and intelligently assigns vehicles to optimal stations, reducing waiting time.",
         "capabilities": [
-            "加氢站实时排队预测",
-            "动态分流与错峰调度",
-            "氢价对比与成本优化",
-            "储氢量预警与补货建议",
+            "Real-time station queue prediction",
+            "Dynamic分流 and off-peak scheduling",
+            "Hydrogen price comparison and cost optimization",
+            "Storage warning and restock recommendations",
         ],
-        "tech": "排队论 + 强化学习",
+        "tech": "M/M/c Erlang C Queuing Theory + Multi-factor Scoring",
+        "scenario": "station_dispatch",
     },
     {
         "key": "fleet_manage",
-        "name": "车队管理 Agent",
+        "name": "Fleet Management Agent",
         "icon": "fleet",
-        "metric": "利用率 +25%",
-        "desc": "全车队运力统一调度，基于订单需求与车辆状态智能分配任务，最大化车辆利用率。",
+        "metric": "Utilization +25%",
+        "desc": "Unified fleet capacity scheduling, intelligent order-vehicle matching based on order demand and vehicle status to maximize utilization.",
         "capabilities": [
-            "车队运力实时画像",
-            "订单-车辆智能匹配",
-            "司机排班优化",
-            "空驶治理与回程货源匹配",
+            "Real-time fleet capacity profiling",
+            "Intelligent order-vehicle matching",
+            "Driver shift optimization",
+            "Empty-trip governance and return freight matching",
         ],
-        "tech": "多目标优化 + MCP协议",
+        "tech": "Multi-objective Weighted Scoring (5-dimension) + Greedy Assignment",
+        "scenario": "fleet_management",
     },
     {
         "key": "cost_analysis",
-        "name": "成本分析 Agent",
+        "name": "Cost Analysis Agent",
         "icon": "cost",
-        "metric": "运营成本 -18%",
-        "desc": "全链路成本拆解：氢能、维保、人工、折旧，提供多维度成本分析与优化建议。",
+        "metric": "Operating cost -18%",
+        "desc": "Full-chain cost breakdown: hydrogen, maintenance, labor, depreciation. Provides multi-dimensional cost analysis and optimization recommendations.",
         "capabilities": [
-            "单车全成本核算",
-            "氢价波动影响分析",
-            "维保成本预测",
-            "TCO对标与优化路径",
+            "Per-vehicle full cost accounting",
+            "Hydrogen price fluctuation impact analysis",
+            "Maintenance cost prediction",
+            "TCO benchmarking and optimization path",
         ],
-        "tech": "OLAP + LLM归因分析",
+        "tech": "OLAP + LLM Attribution Analysis",
+        "scenario": "cost_analysis",
     },
     {
         "key": "fuelcell_health",
-        "name": "燃料电池健康 Agent",
+        "name": "Fuel Cell Health Agent",
         "icon": "health",
-        "metric": "寿命预测准确率 95%+",
-        "desc": "基于电堆电压、温度、衰减率等多维数据，预测燃料电池健康状态与剩余寿命。",
+        "metric": "Health score 0-100 + RUL prediction",
+        "desc": "Based on stack voltage, temperature, degradation rate and other multi-dimensional data to predict fuel cell health status and remaining lifespan.",
         "capabilities": [
-            "电堆性能实时评估",
-            "衰减趋势预测",
-            "维保时机智能推荐",
-            "健康度分级告警",
+            "Polarization curve sampling across power ranges",
+            "Thermal stress analysis (inlet-outlet temperature differential)",
+            "Efficiency analysis (power vs hydrogen consumption)",
+            "Degradation trend prediction and RUL estimation",
+            "Health score computation (0-100) and maintenance recommendations",
         ],
-        "tech": "LSTM时序预测 + 数字孪生",
+        "tech": "Polarization Curve Analysis + Linear RUL Prediction",
+        "scenario": "fuelcell_health",
     },
 ]
 
+# Map agent key -> scenario for ReAct engine
+AGENT_SCENARIO_MAP = {a["key"]: a["scenario"] for a in AGENTS_DATA}
 
-@router.get("/agents", tags=["智能体"])
+
+class AgentExecRequest(BaseModel):
+    """Request body for agent execution."""
+
+    query: str = Field(..., description="User question for the agent")
+    vehicle_plate: str | None = Field(
+        None, description="Target vehicle plate (optional)"
+    )
+    context: dict | None = Field(None, description="Additional context (optional)")
+
+
+@router.get("/agents", tags=["Agents"])
 def list_agents():
-    """六大智能体列表"""
-    return AGENTS_DATA
+    """List all six agents"""
+    # Add LLM status to each agent
+    result = []
+    for a in AGENTS_DATA:
+        agent_info = dict(a)
+        agent_info["llm_enabled"] = settings.llm_enabled
+        result.append(agent_info)
+    return result
 
 
-@router.get("/agents/{agent_key}", tags=["智能体"])
+@router.get("/agents/{agent_key}", tags=["Agents"])
 def get_agent(agent_key: str):
-    """智能体详情"""
+    """Get agent details"""
     for a in AGENTS_DATA:
         if a["key"] == agent_key:
-            return a
-    return {"detail": "not found"}, 404
+            agent_info = dict(a)
+            agent_info["llm_enabled"] = settings.llm_enabled
+            return agent_info
+    raise HTTPException(status_code=404, detail=f"Agent '{agent_key}' not found")
+
+
+@router.post("/agents/{agent_key}/execute", tags=["Agents"])
+def execute_agent(agent_key: str, req: AgentExecRequest):
+    """Execute an agent with a user query.
+
+    Routes to the ReAct engine with the appropriate scenario.
+    When LLM is configured, performs real LLM reasoning;
+    otherwise returns offline sample results.
+    """
+    if agent_key not in AGENT_SCENARIO_MAP:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_key}' not found")
+
+    scenario = AGENT_SCENARIO_MAP[agent_key]
+
+    # Build ReactRequest
+    react_req = ReactRequest(
+        scenario=scenario,
+        query=req.query,
+        vehicle_plate=req.vehicle_plate,
+        context=req.context,
+    )
+
+    if settings.llm_enabled:
+        try:
+            from ..react_engine import ReactEngine
+
+            engine = ReactEngine(react_req)
+            result = engine.run()
+            return {
+                "agent_key": agent_key,
+                "agent_name": next(
+                    a["name"] for a in AGENTS_DATA if a["key"] == agent_key
+                ),
+                "llm_enabled": True,
+                "result": result,
+            }
+        except Exception as e:
+            logger.error(
+                "Agent '%s' LLM execution failed, falling back to offline: %s",
+                agent_key,
+                e,
+            )
+
+    # Offline fallback
+    from .react import _react_offline
+
+    result = _react_offline(react_req)
+    return {
+        "agent_key": agent_key,
+        "agent_name": next(a["name"] for a in AGENTS_DATA if a["key"] == agent_key),
+        "llm_enabled": False,
+        "result": result,
+    }

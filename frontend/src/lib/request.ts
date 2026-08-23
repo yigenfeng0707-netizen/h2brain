@@ -34,11 +34,14 @@ export const apiGet = {
   analysisBenchmark: (vehicleId: string) => api.get(`/analysis/benchmark/${vehicleId}`),
   analysisReport: (vehicleId: string, tripId: number) =>
     api.get(`/analysis/report/${vehicleId}/${tripId}`, { timeout: 30000 }),
+  analysisValue: () => api.get('/analysis/value', { timeout: 30000 }),
 }
 
 export const apiPost = {
   react: (data: { scenario: string; query: string; vehicle_plate?: string }) =>
     api.post('/react', data),
+  agentExecute: (agentKey: string, data: { query: string; vehicle_plate?: string }) =>
+    api.post(`/agents/${agentKey}/execute`, data, { timeout: 30000 }),
   analysisUpload: (data: FormData) =>
     api.post('/analysis/upload', data, { timeout: 120000 }),
 }

@@ -11,7 +11,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.api import health, operations, dispatch, react, agents, display, analysis
+from app.api import (
+    health,
+    operations,
+    dispatch,
+    react,
+    agents,
+    display,
+    analysis,
+    optimization,
+)
 
 API_PREFIX = "/api/v1"
 
@@ -48,6 +57,7 @@ app.include_router(react.router, prefix=API_PREFIX, tags=["ReAct决策"])
 app.include_router(agents.router, prefix=API_PREFIX, tags=["智能体"])
 app.include_router(display.router, prefix=API_PREFIX, tags=["展示"])
 app.include_router(analysis.router, prefix=API_PREFIX, tags=["真实数据分析"])
+app.include_router(optimization.router, prefix=API_PREFIX, tags=["智能优化"])
 
 
 @app.get("/", tags=["根"])

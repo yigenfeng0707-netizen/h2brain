@@ -26,3 +26,7 @@ prometheus-client==0.21.1
 
 # Rate limiting
 slowapi==0.1.9
+
+# Testing
+pytest>=9.0.0
+httpx>=0.28.0

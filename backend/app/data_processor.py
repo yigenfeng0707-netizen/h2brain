@@ -2,6 +2,25 @@
 
 Loads real hydrogen vehicle telemetry CSV data, applies conversion formulas,
 segments trips, classifies road conditions, detects power modes and load changes.
+
+Data Source & Conversion References:
+  - Raw → Physical conversion formulas (rate/offset) are sourced from the official
+    T05 data package document: "数据计算方法(3).md" (数据字段计算方法).
+    Formula: actual_value = raw_value * rate + offset
+    e.g. speed: raw * 0.1 (km/h), current: raw * 0.1 - 3000 (A),
+    temperature: raw - 40 (deg C), pressure: raw * 0.1 (MPa).
+  - H2 lower heating value (LHV) = 33.3 kWh/kg.
+    Source: NIST Chemistry WebBook, Standard Reference Database 69.
+    https://webbook.nist.gov/cgi/cbook.cgi?ID=C1333740 (Hydrogen, H2)
+  - PEM fuel cell nominal efficiency = 50%.
+    Source: DOE Fuel Cell Technologies Office, "Fuel Cells Fact Sheet" (2015),
+    typical PEMFC stack efficiency range 40-60% at rated power.
+    https://www.energy.gov/eere/fuelcells/fuel-cells-fact-sheet
+  - H2 mass calculation uses real-gas equation (from manual record spreadsheet):
+    m = 24.569533 * V * n * P / (101.325 * (T + 273.15 + 1.9155 * P))
+    where V=cylinder volume(L), n=number of cylinders, P=pressure(MPa),
+    T=temperature(degC). The constant 24.569533 incorporates H2 molar mass
+    and unit conversions per the ideal gas law with compressibility correction.
 """
 
 from __future__ import annotations
@@ -15,6 +34,8 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+
+from .thresholds import THRESHOLDS
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -76,6 +97,8 @@ COLUMNS = [
 
 # Conversion formulas: raw_value -> physical_value
 # Format: column_name -> (rate, offset)
+# Reference: Official T05 data package "数据计算方法(3).md"
+# Formula: actual_value = raw_value * rate + offset
 CONVERSIONS = {
     "canData_speed_车速": (0.1, 0),
     "canData_mile_累计里程": (0.1, 0),
@@ -194,10 +217,11 @@ def _load_and_convert(filepath: str, vehicle_id: str) -> pd.DataFrame:
 
     # Compute cumulative H2 consumption from stack power integral
     # H2_rate = stack_power / (LHV * efficiency)
-    # LHV of H2 = 33.3 kWh/kg, PEM fuel cell efficiency ~50%
+    # LHV of H2 = 33.3 kWh/kg (NIST Chemistry WebBook, H2 lower heating value)
+    # PEM fuel cell efficiency = 50% (DOE Fuel Cell Technologies Office, typical PEMFC stack efficiency at rated power)
     # So H2_rate = stack_power / 16.65  (kg/h)
-    H2_LHV = 33.3  # kWh/kg
-    FC_EFFICIENCY = 0.50
+    H2_LHV = 33.3  # kWh/kg, NIST Standard Reference Database 69
+    FC_EFFICIENCY = 0.50  # DOE Fuel Cells Fact Sheet (2015), PEMFC 40-60% range
     dt_seconds = df["timestamp"].diff().dt.total_seconds().fillna(0)
     # Cap dt at 300s to handle data gaps within trips while preserving real power generation time
     dt_seconds = dt_seconds.clip(upper=300)
@@ -265,17 +289,17 @@ def _classify_road_conditions(trip: pd.DataFrame) -> list[dict]:
         speed_std = row["speed_roll_std"]
         power = row["power_roll_mean"]
 
-        if avg_speed < 3:
+        if avg_speed < THRESHOLDS.road_speed_idle:
             cond = "怠速"
-        elif avg_speed < 15:
+        elif avg_speed < THRESHOLDS.road_speed_yard:
             cond = "场区-装卸"
-        elif avg_speed < 50:
-            if speed_std > 15:
+        elif avg_speed < THRESHOLDS.road_speed_urban:
+            if speed_std > THRESHOLDS.road_std_urban:
                 cond = "城市-国道"
             else:
                 cond = "城市-快速路"
-        elif avg_speed < 80:
-            if speed_std > 20:
+        elif avg_speed < THRESHOLDS.road_speed_highway:
+            if speed_std > THRESHOLDS.road_std_mountain:
                 cond = "山区"
             else:
                 cond = "高速"
@@ -423,13 +447,19 @@ def _detect_power_modes(trip: pd.DataFrame) -> list[dict]:
         fc_state = row["fc_work_state"]
         batt_cur = row["batt_cur"]
 
-        if speed < 1 and power > 5:
+        if (
+            speed < THRESHOLDS.power_stationary_speed
+            and power > THRESHOLDS.power_idle_kw
+        ):
             mode = "驻车发电"
-        elif power > 10:
+        elif power > THRESHOLDS.power_drive_kw:
             mode = "燃电"
-        elif speed < 1:
+        elif speed < THRESHOLDS.power_stationary_speed:
             mode = "怠速"
-        elif batt_cur < -5 and power < 5:
+        elif (
+            batt_cur < THRESHOLDS.power_regen_batt_cur
+            and power < THRESHOLDS.power_idle_kw
+        ):
             mode = "能量回收"
         else:
             mode = "纯电"
@@ -530,7 +560,7 @@ def _detect_load_changes(trip: pd.DataFrame) -> list[dict]:
     df["dp_5s"] = df["dp"] / df["dt"] * 5
 
     events = []
-    threshold = 20  # kW per 5s
+    threshold = THRESHOLDS.load_change_rate_kw  # kW per 5s
     in_event = False
     event_start = None
 
@@ -544,7 +574,9 @@ def _detect_load_changes(trip: pd.DataFrame) -> list[dict]:
                 # Record event
                 seg = df.iloc[event_start:i]
                 power_change = seg["stack_power"].iloc[-1] - seg["stack_power"].iloc[0]
-                if abs(power_change) > 10:  # Only record significant changes
+                if (
+                    abs(power_change) > THRESHOLDS.load_change_min_kw
+                ):  # Only record significant changes
                     events.append(
                         {
                             "time": seg["timestamp"].iloc[0].strftime("%H:%M:%S"),
@@ -563,6 +595,17 @@ def _detect_load_changes(trip: pd.DataFrame) -> list[dict]:
 # ---------------------------------------------------------------------------
 # Trip Metrics
 # ---------------------------------------------------------------------------
+
+
+def _get_trip_weather_summary(trip: pd.DataFrame) -> str | None:
+    """Quick weather summary string for overview (lightweight, single API call)."""
+    try:
+        from .weather import tag_trip_weather
+
+        result = tag_trip_weather(trip)
+        return result.get("weather_summary") if result else None
+    except Exception:
+        return None
 
 
 def _compute_trip_overview(trip: pd.DataFrame, trip_id: int, vehicle_id: str) -> dict:
@@ -618,6 +661,7 @@ def _compute_trip_overview(trip: pd.DataFrame, trip_id: int, vehicle_id: str) ->
         "h2_percent_end": round(trip["h2_remain_per"].iloc[-1], 1),
         "gps_start": gps_start,
         "gps_end": gps_end,
+        "weather_summary": _get_trip_weather_summary(trip),
     }
 
 
@@ -670,8 +714,8 @@ def _detect_driving_behaviors(trip: pd.DataFrame) -> list[dict]:
     accel = (df["speed"].diff() / 3.6) / dt  # km/h -> m/s then accel
     accel = accel.fillna(0)
 
-    # Rapid acceleration: > 1.5 m/s^2 sustained for at least 2s
-    rapid_accel_mask = accel > 1.5
+    # Rapid acceleration: > threshold sustained for at least 2s
+    rapid_accel_mask = accel > THRESHOLDS.rapid_accel_ms2
     if rapid_accel_mask.any():
         # Group consecutive True values
         groups = []
@@ -700,8 +744,8 @@ def _detect_driving_behaviors(trip: pd.DataFrame) -> list[dict]:
                 }
             )
 
-    # Hard braking: < -2.0 m/s^2
-    hard_brake_mask = accel < -2.0
+    # Hard braking: below threshold m/s^2
+    hard_brake_mask = accel < THRESHOLDS.hard_brake_ms2
     if hard_brake_mask.any():
         groups = []
         current_group = []
@@ -729,8 +773,8 @@ def _detect_driving_behaviors(trip: pd.DataFrame) -> list[dict]:
                 }
             )
 
-    # Speeding: speed > 90 km/h (typical highway limit for heavy trucks)
-    speeding_mask = df["speed"] > 90
+    # Speeding: speed above threshold (typical highway limit for heavy trucks)
+    speeding_mask = df["speed"] > THRESHOLDS.speeding_kmh
     if speeding_mask.any():
         groups = []
         current_group = []
@@ -786,7 +830,9 @@ def _detect_h2_anomalies(trip: pd.DataFrame, road_segments: list[dict]) -> list[
 
     trip_avg = np.mean(trip_h2_values)
     trip_std = np.std(trip_h2_values) if len(trip_h2_values) > 1 else trip_avg * 0.3
-    threshold = trip_avg + 0.5 * trip_std  # Flag segments above avg + 0.5*std
+    threshold = (
+        trip_avg + THRESHOLDS.anomaly_std_multiplier * trip_std
+    )  # Flag segments above avg + multiplier*std
 
     anomalies = []
     df = trip.copy()
@@ -802,7 +848,7 @@ def _detect_h2_anomalies(trip: pd.DataFrame, road_segments: list[dict]) -> list[
             reasons = []
 
             # 1. High load changes
-            if seg.get("load_changes", 0) > 30:
+            if seg.get("load_changes", 0) > THRESHOLDS.anomaly_high_load_changes:
                 reasons.append(
                     {
                         "factor": "变载频繁",
@@ -812,7 +858,10 @@ def _detect_h2_anomalies(trip: pd.DataFrame, road_segments: list[dict]) -> list[
                 )
 
             # 2. Low average speed (congestion)
-            if seg.get("avg_speed", 0) > 0 and seg["avg_speed"] < 20:
+            if (
+                seg.get("avg_speed", 0) > 0
+                and seg["avg_speed"] < THRESHOLDS.anomaly_low_speed_kmh
+            ):
                 reasons.append(
                     {
                         "factor": "低速行驶",
@@ -822,7 +871,7 @@ def _detect_h2_anomalies(trip: pd.DataFrame, road_segments: list[dict]) -> list[
                 )
 
             # 3. High stack power
-            if seg.get("stack_power_kw", 0) > 100:
+            if seg.get("stack_power_kw", 0) > THRESHOLDS.anomaly_high_power_kw:
                 reasons.append(
                     {
                         "factor": "高功率需求",
@@ -953,9 +1002,12 @@ def _compute_factor_analysis(trip: pd.DataFrame) -> dict:
     df = trip.copy()
 
     # Compute per-minute hydrogen consumption rate
+    # H2 LHV = 33.3 kWh/kg (NIST), PEM FC efficiency = 50% (DOE) — see module docstring
     dt = df["timestamp"].diff().dt.total_seconds().fillna(0)
     dt = dt.clip(lower=0.1, upper=300)
-    h2_rate = df["stack_power"] * dt / 3600 / (33.3 * 0.50)  # kg/h -> kg per interval
+    h2_rate = (
+        df["stack_power"] * dt / 3600 / (33.3 * 0.50)
+    )  # kg per interval; see module docstring for sources
 
     # Compute per-minute aggregates
     df["minute"] = df["timestamp"].dt.floor("min")
@@ -1010,9 +1062,9 @@ def _compute_factor_analysis(trip: pd.DataFrame) -> dict:
     if top_factor:
         summary = f"氢耗与{top_factor['factor']}相关性最强 (r={top_factor['correlation']:.2f}), "
         summary += f"呈{top_factor['direction']}; "
-        if abs(top_factor["correlation"]) > 0.7:
+        if abs(top_factor["correlation"]) > THRESHOLDS.factor_corr_strong:
             summary += "影响显著, 是优化重点方向"
-        elif abs(top_factor["correlation"]) > 0.4:
+        elif abs(top_factor["correlation"]) > THRESHOLDS.factor_corr_moderate:
             summary += "影响中等, 值得关注"
         else:
             summary += "影响较弱"
@@ -1029,11 +1081,11 @@ def _compute_factor_analysis(trip: pd.DataFrame) -> dict:
 def _corr_strength(corr: float) -> str:
     """Describe correlation strength."""
     abs_c = abs(corr)
-    if abs_c > 0.7:
+    if abs_c > THRESHOLDS.factor_corr_strong:
         return "强"
-    elif abs_c > 0.4:
+    elif abs_c > THRESHOLDS.factor_corr_moderate:
         return "中等"
-    elif abs_c > 0.2:
+    elif abs_c > THRESHOLDS.factor_corr_weak:
         return "弱"
     return "极弱"
 
@@ -1440,6 +1492,15 @@ class DataProcessor:
         # Factor analysis
         factor_analysis = _compute_factor_analysis(trip)
 
+        # Weather tags (Open-Meteo Archive API)
+        weather_tags = None
+        try:
+            from .weather import tag_trip_weather
+
+            weather_tags = tag_trip_weather(trip)
+        except Exception:
+            pass
+
         detail = {
             "overview": overview,
             "road_segments": road_segments,
@@ -1452,6 +1513,7 @@ class DataProcessor:
             "driving_behaviors": driving_behaviors,
             "anomalies": anomalies,
             "factor_analysis": factor_analysis,
+            "weather": weather_tags,
         }
 
         self._trip_details[cache_key] = detail
@@ -1522,6 +1584,31 @@ class DataProcessor:
             "trips_detected": len(trips),
             "vehicles": vehicles,
         }
+
+    def calibrate_thresholds(self) -> dict:
+        """Run data-driven threshold calibration and return report."""
+        self._ensure_loaded()
+        from .thresholds import calibrate_from_data
+
+        result = calibrate_from_data(self._vehicle_data, self._trips)
+
+        # Clear trip detail cache so new thresholds take effect
+        self._trip_details.clear()
+
+        return result
+
+    def get_thresholds(self) -> dict:
+        """Return current threshold values."""
+        from .thresholds import THRESHOLDS
+
+        return THRESHOLDS.to_dict()
+
+    def apply_calibrated_thresholds(self, calibrated: dict):
+        """Apply calibrated threshold values."""
+        from .thresholds import THRESHOLDS
+
+        THRESHOLDS.update(calibrated)
+        self._trip_details.clear()
 
 
 # Singleton instance

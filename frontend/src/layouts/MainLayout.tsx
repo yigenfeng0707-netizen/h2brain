@@ -22,6 +22,7 @@ const NAV_ITEMS = [
   { key: '/case', label: '案例数据看板', icon: '+' },
   { key: '/pricing', label: 'SaaS 定价', icon: '$' },
   { key: '/trip-analysis', label: '行程分析 Dashboard', icon: '~' },
+  { key: '/value-analysis', label: '价值量化分析', icon: 'V' },
 ]
 
 function renderMenu(selectedKey: string, onNavigate: (key: string) => void) {

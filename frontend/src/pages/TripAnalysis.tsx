@@ -30,6 +30,7 @@ interface TripSummary {
   h2_percent_end: number
   gps_start: [number, number]
   gps_end: [number, number]
+  weather_summary?: string
 }
 
 interface RoadSegment {
@@ -169,6 +170,14 @@ interface AnalysisReport {
   recommendations: string[]
 }
 
+interface WeatherInfo {
+  weather_summary: string
+  avg_temperature: number | null
+  weather_start: { label: string; temp: number; wind: number } | null
+  weather_mid: { label: string; temp: number; wind: number } | null
+  weather_end: { label: string; temp: number; wind: number } | null
+}
+
 interface TripDetail {
   overview: TripSummary
   road_segments: RoadSegment[]
@@ -181,6 +190,7 @@ interface TripDetail {
   anomalies: Anomaly[]
   driving_behaviors: DrivingBehavior[]
   factor_analysis: FactorAnalysis
+  weather?: WeatherInfo | null
 }
 
 interface Vehicle {
@@ -706,6 +716,11 @@ export default function TripAnalysis() {
               <span style={{ marginLeft: 12, color: 'rgba(224,245,232,0.5)', fontSize: 13 }}>
                 {ov.date} {ov.start_time}→{ov.end_time} · GPS: {fmtGPS(ov.gps_start)} →{' '}
                 {fmtGPS(ov.gps_end)}
+                {ov.weather_summary && (
+                  <span style={{ marginLeft: 8, color: '#69F0AE' }}>
+                    🌤 {ov.weather_summary}
+                  </span>
+                )}
               </span>
             </div>
 
@@ -1083,6 +1098,57 @@ export default function TripAnalysis() {
                     {tripDetail.factor_analysis.summary}
                   </div>
                 )}
+              </Card>
+            )}
+
+            {/* Weather Tags */}
+            {tripDetail.weather && (
+              <Card
+                size="small"
+                title={
+                  <span style={{ color: '#69F0AE' }}>
+                    🌤 天气标签 · Open-Meteo 气象数据
+                  </span>
+                }
+                style={{ marginTop: 12, background: 'rgba(10,46,31,0.4)' }}
+              >
+                <Row gutter={[12, 8]}>
+                  <Col xs={24} md={6}>
+                    <Statistic
+                      title="全程天气"
+                      value={tripDetail.weather.weather_summary || '—'}
+                    />
+                  </Col>
+                  <Col xs={24} md={6}>
+                    <Statistic
+                      title="平均气温"
+                      value={
+                        tripDetail.weather.avg_temperature != null
+                          ? `${tripDetail.weather.avg_temperature.toFixed(1)} °C`
+                          : '—'
+                      }
+                    />
+                  </Col>
+                  {(['weather_start', 'weather_mid', 'weather_end'] as const).map((key) => {
+                    const w = tripDetail.weather![key]
+                    const labelMap = { weather_start: '起点', weather_mid: '中段', weather_end: '终点' }
+                    return (
+                      <Col xs={12} md={4} key={key}>
+                        <div style={{ textAlign: 'center' }}>
+                          <div style={{ fontSize: 12, color: 'rgba(224,245,232,0.45)' }}>
+                            {labelMap[key]}
+                          </div>
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#E0F5E8' }}>
+                            {w ? w.label : '—'}
+                          </div>
+                          <div style={{ fontSize: 12, color: 'rgba(224,245,232,0.5)' }}>
+                            {w ? `${w.temp.toFixed(1)}°C · ${w.wind.toFixed(1)}m/s` : ''}
+                          </div>
+                        </div>
+                      </Col>
+                    )
+                  })}
+                </Row>
               </Card>
             )}
 
