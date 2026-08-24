@@ -22,7 +22,7 @@ _fallback_client: OpenAI | None = None
 # Retry config - tuned for ModelScope container constraints
 _MAX_RETRIES = 1
 _RETRY_BASE_DELAY = 0.5  # seconds
-_REQUEST_TIMEOUT = 15  # seconds
+_REQUEST_TIMEOUT = 30  # seconds (ReAct prompts are complex, need more time)
 
 
 def get_client() -> OpenAI | None:
