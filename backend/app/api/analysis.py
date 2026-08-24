@@ -7,7 +7,6 @@ Endpoints for hydrogen vehicle trip analysis:
 """
 
 import json
-import os
 import tempfile
 
 import numpy as np

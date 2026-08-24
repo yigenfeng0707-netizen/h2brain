@@ -14,7 +14,6 @@ import logging
 import os
 import time
 import urllib.request
-from datetime import datetime, timezone, timedelta
 from typing import Any
 
 import pandas as pd
@@ -233,7 +232,7 @@ def tag_trip_weather(trip: pd.DataFrame) -> dict[str, Any]:
 
     # Get GPS at start, mid, end
     start_row = valid_gps.iloc[0]
-    end_row = valid_gps.iloc[-1]
+    valid_gps.iloc[-1]
     mid_row = valid_gps.iloc[len(valid_gps) // 2]
 
     # Date range for API (may span multiple days)

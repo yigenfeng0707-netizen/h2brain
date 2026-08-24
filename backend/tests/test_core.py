@@ -18,21 +18,9 @@ import pytest
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
 from app.data_processor import (
-    DataProcessor,
     get_processor,
-    _load_and_convert,
-    _segment_trips,
-    _classify_road_conditions,
-    _detect_power_modes,
-    _detect_load_changes,
-    _compute_trip_overview,
-    _detect_driving_behaviors,
-    _detect_h2_anomalies,
-    _compute_factor_analysis,
-    _benchmark_trips,
     _rate_h2,
     _corr_strength,
-    _generate_analysis_report,
     CONVERSIONS,
     TRIP_GAP_THRESHOLD,
     VEHICLE_FILES,

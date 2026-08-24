@@ -39,9 +39,44 @@ export const apiGet = {
 
 export const apiPost = {
   react: (data: { scenario: string; query: string; vehicle_plate?: string }) =>
-    api.post('/react', data),
+    api.post('/react', data, { timeout: 300000 }),
   agentExecute: (agentKey: string, data: { query: string; vehicle_plate?: string }) =>
-    api.post(`/agents/${agentKey}/execute`, data, { timeout: 90000 }),
+    api.post(`/agents/${agentKey}/execute`, data, { timeout: 300000 }),
   analysisUpload: (data: FormData) =>
     api.post('/analysis/upload', data, { timeout: 120000 }),
+}
+
+// Agent SSE 流式执行: 后端逐事件推送, 免疫网关/axios超时
+export async function agentExecuteStream(
+  agentKey: string,
+  data: { query: string; vehicle_plate?: string },
+  onEvent: (event: any) => void,
+): Promise<void> {
+  const base = import.meta.env.VITE_API_BASE || '/api/v1'
+  const resp = await fetch(`${base}/agents/${agentKey}/execute/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!resp.ok || !resp.body) throw new Error(`stream failed: ${resp.status}`)
+
+  const reader = resp.body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    buffer += decoder.decode(value, { stream: true })
+    const parts = buffer.split('\n\n')
+    buffer = parts.pop() || ''
+    for (const part of parts) {
+      const line = part.trim()
+      if (!line.startsWith('data: ')) continue
+      const payload = line.slice(6)
+      if (payload === '[DONE]') return
+      try {
+        onEvent(JSON.parse(payload))
+      } catch { /* 忽略无法解析的片段 */ }
+    }
+  }
 }

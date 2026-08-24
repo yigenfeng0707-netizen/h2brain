@@ -9,7 +9,6 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-import pandas as pd
 
 logger = logging.getLogger("h2brain.value_analysis")
 
@@ -97,7 +96,7 @@ def compute_value_analysis(
 
     # ── Annual projection ──
     data_period_days = 18  # Data covers Aug 1-18 (18 days)
-    annual_scale = (
+    (
         ANNUAL_MILEAGE_KM * vehicle_count / (total_km / data_period_days * 365)
         if total_km > 0
         else 1

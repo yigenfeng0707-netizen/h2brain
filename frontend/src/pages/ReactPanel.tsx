@@ -1,6 +1,6 @@
 // 氢智行 H2Brain - ReAct 决策面板
 import { useEffect, useState } from 'react'
-import { Card, Row, Col, Select, Input, Button, Tag, Spin, Empty, Typography } from 'antd'
+import { Card, Row, Col, Select, Input, Button, Tag, Spin, Empty, Typography, message } from 'antd'
 import { apiGet, apiPost } from '@/lib/request'
 
 const { TextArea } = Input
@@ -56,7 +56,7 @@ export default function ReactPanel() {
       const res = await apiPost.react({ scenario, query })
       setResult(res.data)
     } catch {
-      // ignore
+      message.error('推理请求失败或超时，请重试')
     }
     setLoading(false)
   }

@@ -21,12 +21,10 @@ Physical Constants & References:
 
 from __future__ import annotations
 
-import math
 import logging
 from datetime import datetime
 from typing import Any
 
-import numpy as np
 import pandas as pd
 
 from .data_processor import get_processor, VEHICLE_FILES
@@ -213,7 +211,6 @@ def analyze_fuel_cell_health(vehicle_id: str) -> dict[str, Any]:
     # 3. Efficiency Analysis (Power vs H2 Consumption)
     # -----------------------------------------------------------------------
     h2_consume_col = "celDataExt_h2_total_consume_累计氢耗"
-    h2_col = "celDataExt_h2Per100Km_百公里氢耗"
 
     total_power = float((stack_power[active_mask]).sum())  # kW (per 10s interval)
     # Approximate energy: power * interval (10s = 1/360 h)
@@ -305,7 +302,7 @@ def analyze_fuel_cell_health(vehicle_id: str) -> dict[str, Any]:
     voltage_score = max(0, min(100, voltage_ratio * 100))
 
     # Thermal score: penalty for high temp differential
-    mean_temp_diff = thermal["temp_differential"]["mean"]
+    thermal["temp_differential"]["mean"]
     max_temp_diff = thermal["temp_differential"]["max"]
     thermal_score = max(0, 100 - (max_temp_diff / REF_TEMP_DIFF_MAX) * 30)
 

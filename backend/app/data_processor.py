@@ -25,12 +25,10 @@ Data Source & Conversion References:
 
 from __future__ import annotations
 
-import json
 import os
 import pickle
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -287,7 +285,7 @@ def _classify_road_conditions(trip: pd.DataFrame) -> list[dict]:
     for _, row in df.iterrows():
         avg_speed = row["speed_roll_mean"]
         speed_std = row["speed_roll_std"]
-        power = row["power_roll_mean"]
+        row["power_roll_mean"]
 
         if avg_speed < THRESHOLDS.road_speed_idle:
             cond = "怠速"
@@ -341,8 +339,8 @@ def _add_road_segment(segments: list, seg: pd.DataFrame):
         distance = 0
     moving = seg[seg["speed"] > 1]
     avg_speed = moving["speed"].mean() if len(moving) > 0 else 0
-    h2_start = seg["h2_remain"].iloc[0]
-    h2_end = seg["h2_remain"].iloc[-1]
+    seg["h2_remain"].iloc[0]
+    seg["h2_remain"].iloc[-1]
     # Use cumulative H2 from power integral
     h2_used = max(0, seg["h2_consumed_cum"].iloc[-1] - seg["h2_consumed_cum"].iloc[0])
     h2_per_100 = (h2_used / distance * 100) if distance > 0.1 else 0
@@ -444,7 +442,7 @@ def _detect_power_modes(trip: pd.DataFrame) -> list[dict]:
     for _, row in df.iterrows():
         speed = row["speed"]
         power = row["stack_power"]
-        fc_state = row["fc_work_state"]
+        row["fc_work_state"]
         batt_cur = row["batt_cur"]
 
         if (
@@ -836,7 +834,7 @@ def _detect_h2_anomalies(trip: pd.DataFrame, road_segments: list[dict]) -> list[
 
     anomalies = []
     df = trip.copy()
-    ts_start = df["timestamp"].iloc[0]
+    df["timestamp"].iloc[0]
 
     for seg in road_segments:
         h2 = seg.get("h2_per_100km", 0)
@@ -980,7 +978,7 @@ def _generate_suggestion(reasons: list[dict], seg: dict) -> str:
         if r["factor"] == "变载频繁":
             suggestions.append("建议保持匀速行驶, 减少急加速急减速, 降低功率波动频率")
         elif r["factor"] == "高功率需求":
-            suggestions.append(f"建议控制车速在经济区间(60-70km/h), 降低电堆功率输出")
+            suggestions.append("建议控制车速在经济区间(60-70km/h), 降低电堆功率输出")
         elif r["factor"] == "山区爬坡":
             suggestions.append("山区路段建议提前加速冲坡, 避免坡中大功率持续输出")
         elif r["factor"] == "长时间怠速":
@@ -1005,7 +1003,7 @@ def _compute_factor_analysis(trip: pd.DataFrame) -> dict:
     # H2 LHV = 33.3 kWh/kg (NIST), PEM FC efficiency = 50% (DOE) — see module docstring
     dt = df["timestamp"].diff().dt.total_seconds().fillna(0)
     dt = dt.clip(lower=0.1, upper=300)
-    h2_rate = (
+    (
         df["stack_power"] * dt / 3600 / (33.3 * 0.50)
     )  # kg per interval; see module docstring for sources
 

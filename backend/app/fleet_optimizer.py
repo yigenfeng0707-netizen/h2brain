@@ -12,12 +12,9 @@ Uses greedy assignment with priority queue for near-optimal solution.
 
 from __future__ import annotations
 
-import math
-import json
 from typing import Any
 
 from .mock_data import get_vehicles, get_orders, VehicleStatus
-from .route_optimizer import haversine_distance
 
 # Scoring weights (sum to 1.0)
 W_H2 = 0.30  # Hydrogen sufficiency

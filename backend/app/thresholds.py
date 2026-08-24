@@ -255,7 +255,7 @@ def calibrate_from_data(
     # --- Generate report ---
     report_lines = [
         "# H2Brain 阈值标定报告",
-        f"",
+        "",
         f"数据样本: {len(all_trips)} 个行程, {len(combined)} 行遥测数据",
         f"有效运动数据: {len(moving)} 行, 静止数据: {len(stationary)} 行",
         "",
@@ -318,8 +318,8 @@ def calibrate_from_data(
         )
 
     report_lines.append("\n## 标定结果对比")
-    report_lines.append(f"| 参数 | 默认值 | 标定值 | 变化 |")
-    report_lines.append(f"|------|--------|--------|------|")
+    report_lines.append("| 参数 | 默认值 | 标定值 | 变化 |")
+    report_lines.append("|------|--------|--------|------|")
     for key, new_val in sorted(calibrated.items()):
         old_val = DEFAULTS.get(key, "N/A")
         if isinstance(old_val, (int, float)):

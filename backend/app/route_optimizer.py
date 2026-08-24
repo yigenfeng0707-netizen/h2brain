@@ -7,10 +7,9 @@ Station scheduling: M/M/c queuing theory model for wait time prediction
 from __future__ import annotations
 
 import math
-import json
 from typing import Any
 
-from .mock_data import get_vehicles, get_stations, get_orders
+from .mock_data import get_vehicles, get_stations
 
 # Earth radius in km
 EARTH_RADIUS_KM = 6371.0
@@ -130,7 +129,7 @@ def plan_route(
 
     # Direct route feasible?
     direct_feasible = direct_distance <= safe_range
-    arrival_h2_pct = max(
+    max(
         0,
         vehicle.hydrogen_level
         - (direct_distance / safe_range * vehicle.hydrogen_level * 0.85)
@@ -315,7 +314,7 @@ def compute_mm_c_wait_time(
     # Average wait time Wq = Lq / lam
     wq = lq / lam if lam > 0 else 0
     # Average system length L = Lq + a
-    l = lq + a
+    sys_len = lq + a
     # Average system time W = Wq + 1/mu
     w = wq + 1.0 / mu if mu > 0 else 0
 
@@ -323,7 +322,7 @@ def compute_mm_c_wait_time(
         "utilization": round(rho, 3),
         "queue_length_avg": round(lq, 2),
         "wait_time_avg_min": round(wq, 1),
-        "system_length_avg": round(l, 2),
+        "system_length_avg": round(sys_len, 2),
         "system_time_avg_min": round(w, 1),
         "idle_probability": round(p0, 3),
         "stable": True,

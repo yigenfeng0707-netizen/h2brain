@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Spin, Empty, Tag, Row, Col, Input, Button, Card, Space, Typography, Tooltip } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, BulbOutlined, CheckCircleOutlined } from '@ant-design/icons'
-import { apiGet, apiPost } from '@/lib/request'
+import { apiGet, apiPost, agentExecuteStream } from '@/lib/request'
 
 const { Text, Paragraph } = Typography
 
@@ -22,6 +22,8 @@ interface ChatMessage {
   content: string
   timestamp: string
   offline?: boolean
+  thinking?: boolean
+  key?: string
 }
 
 // Preset questions per agent type
@@ -91,27 +93,48 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
     setInput('')
     setAsking(true)
 
+    const ts = () => new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    // 思考过程气泡: 随流式事件渐进更新, 最终被答案替换
+    const thinkingId = `thinking-${Date.now()}`
+    setMessages(prev => [...prev, { role: 'agent', content: '正在思考...', timestamp: ts(), thinking: true, key: thinkingId }])
+
+    const updateThinking = (text: string) => {
+      setMessages(prev => prev.map(m => (m as any).key === thinkingId ? { ...m, content: text } : m))
+    }
+    const replaceWithAnswer = (content: string, offline = false) => {
+      setMessages(prev => prev.map(m => (m as any).key === thinkingId
+        ? { ...m, content, thinking: false, offline, timestamp: ts() }
+        : m))
+    }
+
     try {
-      const res = await apiPost.agentExecute(agentKey, { query: question })
-      const result = res.data?.result || {}
-      const agentReply = result.final_answer
-        || result.answer
-        || result.response
-        || result.summary
-        || JSON.stringify(result, null, 2)
-      const isOffline = res.data?.llm_enabled === false
-      setMessages(prev => [...prev, {
-        role: 'agent',
-        content: typeof agentReply === 'string' ? agentReply : JSON.stringify(agentReply, null, 2),
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-        offline: isOffline,
-      }])
+      await agentExecuteStream(agentKey, { query: question }, (ev) => {
+        if (ev.type === 'step') {
+          const action = ev.action ? String(ev.action).split('(')[0] : ''
+          updateThinking(`步骤 ${ev.index + 1}: ${action || '分析中'}…\n${ev.observation ? String(ev.observation).slice(0, 120) : ''}`)
+        } else if (ev.type === 'final') {
+          replaceWithAnswer(String(ev.answer ?? ''))
+        } else if (ev.type === 'error') {
+          replaceWithAnswer(`推理失败: ${ev.message || '未知错误'}，请重试。`)
+        }
+      })
+      // 兜底: 流结束但思考气泡未被替换(如 final 缺失)
+      setMessages(prev => prev.map(m => (m as any).key === thinkingId && m.thinking
+        ? { ...m, content: '推理已完成但未返回结论，请重试。', thinking: false }
+        : m))
     } catch {
-      setMessages(prev => [...prev, {
-        role: 'agent',
-        content: '智能体响应超时，正在以离线模式返回分析结果。请稍后重试或检查网络连接。',
-        timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
-      }])
+      // 流式彻底失败(网络/路由) -> 降级到 POST 重试一次
+      try {
+        const res = await apiPost.agentExecute(agentKey, { query: question })
+        const result = res.data?.result || {}
+        const agentReply = result.final_answer || result.answer || result.response || result.summary
+        replaceWithAnswer(
+          typeof agentReply === 'string' ? agentReply : JSON.stringify(result, null, 2),
+          res.data?.llm_enabled === false,
+        )
+      } catch {
+        replaceWithAnswer('智能体请求失败，请稍后重试或检查网络连接。')
+      }
     } finally {
       setAsking(false)
     }
@@ -246,9 +269,12 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
                     border: `1px solid ${msg.role === 'user' ? 'rgba(0,229,255,0.2)' : 'rgba(105,240,174,0.2)'}`,
                   }}>
                     <Paragraph style={{
-                      margin: 0, color: 'rgba(224,245,232,0.9)', fontSize: 13,
+                      margin: 0,
+                      color: msg.thinking ? 'rgba(224,245,232,0.45)' : 'rgba(224,245,232,0.9)',
+                      fontSize: 13,
                       whiteSpace: 'pre-wrap',
                     }}>
+                      {msg.thinking && <Spin size="small" style={{ marginRight: 8 }} />}
                       {msg.content}
                     </Paragraph>
                     <Text style={{ fontSize: 10, color: 'rgba(224,245,232,0.25)' }}>
@@ -260,24 +286,6 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
                   </div>
                 </div>
               ))}
-              {asking && (
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{
-                    width: 32, height: 32, borderRadius: '50%',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    background: 'rgba(0,200,83,0.15)', color: '#69F0AE',
-                  }}>
-                    <RobotOutlined />
-                  </div>
-                  <div style={{
-                    padding: '8px 16px', borderRadius: '2px 12px 12px 12px',
-                    background: 'rgba(0,200,83,0.05)',
-                    border: '1px solid rgba(105,240,174,0.15)',
-                  }}>
-                    <Spin size="small" /> <Text style={{ color: 'rgba(224,245,232,0.4)', fontSize: 13, marginLeft: 8 }}>思考中...</Text>
-                  </div>
-                </div>
-              )}
               <div ref={chatEndRef} />
             </div>
 

@@ -7,9 +7,11 @@ Provides six hydrogen-energy intelligent agents:
 
 from __future__ import annotations
 
+import json
 import logging
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from ..config import settings
@@ -202,3 +204,46 @@ def execute_agent(agent_key: str, req: AgentExecRequest):
         "llm_enabled": False,
         "result": result,
     }
+
+
+@router.post("/agents/{agent_key}/execute/stream", tags=["Agents"])
+def execute_agent_stream(agent_key: str, req: AgentExecRequest):
+    """Execute an agent with SSE streaming (immune to gateway/axios timeouts).
+
+    Events:
+      {"type": "step", "index": N, "thought": ..., "action": ..., "observation": ...}
+      {"type": "final", "answer": ..., "scenario": ...}
+      {"type": "error", "message": ...}
+      [DONE]
+    """
+    if agent_key not in AGENT_SCENARIO_MAP:
+        raise HTTPException(status_code=404, detail=f"Agent '{agent_key}' not found")
+
+    scenario = AGENT_SCENARIO_MAP[agent_key]
+    react_req = ReactRequest(
+        scenario=scenario,
+        query=req.query,
+        vehicle_plate=req.vehicle_plate,
+        context=req.context,
+    )
+
+    def event_generator():
+        if not settings.llm_enabled:
+            err = {"type": "error", "message": "LLM 未配置"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+            return
+        try:
+            from ..react_engine import ReactEngine
+
+            engine = ReactEngine(react_req)
+            for event in engine.run_stream():
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:  # noqa: BLE001 - top-level guard for the stream
+            logger.error("Agent '%s' stream failed: %s", agent_key, e)
+            err = {"type": "error", "message": f"推理失败: {e}"}
+            yield f"data: {json.dumps(err, ensure_ascii=False)}\n\n"
+            yield "data: [DONE]\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
