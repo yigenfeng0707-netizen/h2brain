@@ -17,10 +17,15 @@ class Settings(BaseSettings):
     app_env: str = "demo"
     debug: bool = True
 
-    # 大模型（OpenAI 兼容接口）
+    # 大模型 - 主用（OpenAI 兼容接口）
     llm_api_key: str = ""
     llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4"
     llm_model: str = "glm-4.6"
+
+    # 大模型 - Fallback（主用失败后自动切换）
+    llm_fallback_api_key: str = ""
+    llm_fallback_base_url: str = ""
+    llm_fallback_model: str = ""
 
     # 发布标识
     release_id: str = "development"
@@ -46,6 +51,11 @@ class Settings(BaseSettings):
     def llm_enabled(self) -> bool:
         """是否启用了真实 LLM 调用。"""
         return bool(self.llm_api_key and self.llm_api_key.strip())
+
+    @property
+    def llm_fallback_enabled(self) -> bool:
+        """是否启用了 fallback LLM。"""
+        return bool(self.llm_fallback_api_key and self.llm_fallback_api_key.strip())
 
 
 @lru_cache

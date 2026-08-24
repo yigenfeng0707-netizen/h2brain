@@ -51,7 +51,10 @@ RUN echo 'APP_ENV=production' > /app/backend/.env && \
     echo 'CORS_ORIGINS=["*"]' >> /app/backend/.env && \
     echo 'LLM_API_KEY=sk-bulmEVxNZokZedif4sxINRbv5hbD7SVd' >> /app/backend/.env && \
     echo 'LLM_BASE_URL=https://token.sensenova.cn/v1' >> /app/backend/.env && \
-    echo 'LLM_MODEL=sensenova-6.8-flash-lite' >> /app/backend/.env
+    echo 'LLM_MODEL=sensenova-6.8-flash-lite' >> /app/backend/.env && \
+    echo 'LLM_FALLBACK_API_KEY=sk-sp-D.LXPDL.5k6I.MEQCIDuqxqg3K8b9K93IKUJEkAcAE4timovb68fQCPI0RXzpAiBtQI3gsPIewhgz+RF1pKwNW0ZDojt6kx9NArJdOGLtNQ==' >> /app/backend/.env && \
+    echo 'LLM_FALLBACK_BASE_URL=https://token-plan.cn-beijing.maas.aliyuncs.com/compatible-mode/v1' >> /app/backend/.env && \
+    echo 'LLM_FALLBACK_MODEL=qwen-plus' >> /app/backend/.env
 
 EXPOSE 7860
 
