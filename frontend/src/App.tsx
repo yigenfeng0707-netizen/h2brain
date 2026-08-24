@@ -11,6 +11,7 @@ import CaseDashboard from '@/pages/CaseDashboard'
 import SaaSPricing from '@/pages/SaaSPricing'
 import TripAnalysis from '@/pages/TripAnalysis'
 import ValueAnalysis from '@/pages/ValueAnalysis'
+import ErrorBoundary from '@/components/ErrorBoundary'
 import HydrogenOptAgent from '@/pages/agents/HydrogenOptAgent'
 import RouteAgent from '@/pages/agents/RouteAgent'
 import StationAgent from '@/pages/agents/StationAgent'
@@ -47,7 +48,7 @@ export default function App() {
             <Route path="/architecture" element={<Architecture />} />
             <Route path="/case" element={<CaseDashboard />} />
             <Route path="/pricing" element={<SaaSPricing />} />
-            <Route path="/trip-analysis" element={<TripAnalysis />} />
+            <Route path="/trip-analysis" element={<ErrorBoundary><TripAnalysis /></ErrorBoundary>} />
             <Route path="/value-analysis" element={<ValueAnalysis />} />
           </Route>
         </Routes>

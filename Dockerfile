@@ -43,13 +43,15 @@ COPY deploy/modelscope/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 # Environment
 ENV APP_ENV=production
 ENV DEBUG=false
-ENV LLM_ENABLED=false
 ENV H2BRAIN_DATA_DIR=/app/data
 
 # Overwrite .env with production values (avoid local dev .env leaking into container)
 RUN echo 'APP_ENV=production' > /app/backend/.env && \
     echo 'DEBUG=false' >> /app/backend/.env && \
-    echo 'CORS_ORIGINS=["*"]' >> /app/backend/.env
+    echo 'CORS_ORIGINS=["*"]' >> /app/backend/.env && \
+    echo 'LLM_API_KEY=sk-bulmEVxNZokZedif4sxINRbv5hbD7SVd' >> /app/backend/.env && \
+    echo 'LLM_BASE_URL=https://token.sensenova.cn/v1' >> /app/backend/.env && \
+    echo 'LLM_MODEL=sensenova-6.8-flash-lite' >> /app/backend/.env
 
 EXPOSE 7860
 

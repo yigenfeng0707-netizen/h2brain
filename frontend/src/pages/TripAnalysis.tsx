@@ -326,7 +326,7 @@ function LoadChangeChart({
         if (idx === undefined) return ''
         const pt = changePoints.find((p) => p.idx === idx)
         if (pt) {
-          return `变载事件<br/>类型: ${pt.type}<br/>功率变化: ${pt.delta.toFixed(1)} kW`
+          return `变载事件<br/>类型: ${pt.type}<br/>功率变化: ${fmtNum(pt.delta, 1)} kW`
         }
         return `时间: ${ts.timestamps[idx]} min`
       },
@@ -483,7 +483,7 @@ function ColorBar({ bands }: { bands: RoadBand[] }) {
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}
-            title={`${b.road_type} (${b.start_min.toFixed(0)}~${b.end_min.toFixed(0)}min)`}
+            title={`${b.road_type} (${fmtNum(b.start_min, 0)}~${fmtNum(b.end_min, 0)}min)`}
           >
             {width > 5 ? b.road_type : ''}
           </div>
@@ -670,7 +670,7 @@ export default function TripAnalysis() {
                 style={{ width: 200 }}
                 options={vehicles.map((v) => ({
                   value: v.vehicle_id,
-                  label: `${v.vehicle_id} (${v.total_trips}行程 / ${v.total_distance_km.toFixed(0)}km)`,
+                  label: `${v.vehicle_id} (${v.total_trips}行程 / ${fmtNum(v.total_distance_km, 0)}km)`,
                 }))}
               />
             </Col>
@@ -681,7 +681,7 @@ export default function TripAnalysis() {
                 style={{ width: 320 }}
                 options={trips.map((t) => ({
                   value: t.trip_id,
-                  label: `#${t.trip_id} ${t.date} ${t.start_time}-${t.end_time} (${t.distance_km.toFixed(0)}km)`,
+                  label: `#${t.trip_id} ${t.date} ${t.start_time}-${t.end_time} (${fmtNum(t.distance_km, 0)}km)`,
                 }))}
               />
             </Col>
@@ -857,7 +857,7 @@ export default function TripAnalysis() {
                         color: '#fff',
                         overflow: 'hidden',
                       }}
-                      title={`${b.mode} (${b.start_min.toFixed(0)}~${b.end_min.toFixed(0)}min)`}
+                      title={`${b.mode} (${fmtNum(b.start_min, 0)}~${fmtNum(b.end_min, 0)}min)`}
                     >
                       {width > 6 ? b.mode : ''}
                     </div>
@@ -900,12 +900,12 @@ export default function TripAnalysis() {
                       </Col>
                       <Col>
                         <span style={{ color: '#FF6B6B', fontWeight: 600 }}>
-                          {a.h2_per_100km.toFixed(2)} kg/100km
+                          {fmtNum(a.h2_per_100km, 2)} kg/100km
                         </span>
                       </Col>
                       <Col>
-                        <Tag color={a.deviation_pct > 100 ? 'volcano' : 'orange'}>
-                          偏高 {a.deviation_pct.toFixed(1)}%
+                        <Tag color={(a.deviation_pct ?? 0) > 100 ? 'volcano' : 'orange'}>
+                          偏高 {fmtNum(a.deviation_pct, 1)}%
                         </Tag>
                       </Col>
                     </Row>
@@ -1085,7 +1085,7 @@ export default function TripAnalysis() {
                               />
                             </div>
                             <span style={{ fontSize: 12, color: barColor, fontWeight: 600, minWidth: 60, textAlign: 'right' }}>
-                              r={f.correlation.toFixed(3)} ({f.direction})
+                              r={fmtNum(f.correlation, 3)} ({f.direction})
                             </span>
                           </div>
                         </div>
@@ -1142,7 +1142,7 @@ export default function TripAnalysis() {
                             {w ? w.label : '—'}
                           </div>
                           <div style={{ fontSize: 12, color: 'rgba(224,245,232,0.5)' }}>
-                            {w ? `${w.temp.toFixed(1)}°C · ${w.wind.toFixed(1)}m/s` : ''}
+                            {w ? `${fmtNum(w.temp, 1)}°C · ${fmtNum(w.wind, 1)}m/s` : ''}
                           </div>
                         </div>
                       </Col>
@@ -1158,7 +1158,7 @@ export default function TripAnalysis() {
                 size="small"
                 title={
                   <span style={{ color: '#69F0AE' }}>
-                    <BarChartOutlined /> 同类行程对标 · {selectedVehicle} 全部 {benchmark.comparisons.length} 个行程 · 平均 {benchmark.avg_h2_per_100km.toFixed(2)} kg/100km
+                    <BarChartOutlined />                     同类行程对标 · {selectedVehicle} 全部 {benchmark.comparisons.length} 个行程 · 平均 {fmtNum(benchmark.avg_h2_per_100km, 2)} kg/100km
                   </span>
                 }
                 style={{ marginTop: 12, background: 'rgba(10,46,31,0.4)' }}
@@ -1218,13 +1218,14 @@ export default function TripAnalysis() {
                         title: 'vs 均值',
                         dataIndex: 'vs_avg',
                         width: 90,
-                        render: (v: number) => {
-                          const color = v < -5 ? '#69F0AE' : v > 5 ? '#FF6B6B' : '#FFB347'
-                          const sign = v > 0 ? '+' : ''
-                          return (
-                            <span style={{ color }}>
-                              {sign}
-                              {v.toFixed(1)}%
+                          render: (v: number) => {
+                            const vv = v ?? 0
+                            const color = vv < -5 ? '#69F0AE' : vv > 5 ? '#FF6B6B' : '#FFB347'
+                            const sign = vv > 0 ? '+' : ''
+                            return (
+                              <span style={{ color }}>
+                                {sign}
+                                {fmtNum(vv, 1)}%
                             </span>
                           )
                         },
