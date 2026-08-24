@@ -6,46 +6,88 @@ on:
     - cron: '*/5 * * * *'
   workflow_dispatch: # Allow manual trigger
 
+permissions:
+  actions: write # 清理历史 run 需要
+  contents: read
+
+env:
+  MS_OWNER: gsym236998
+  MS_REPO: h2brain
+  # 版本特征: 必须与 Dockerfile 主用 LLM 保持一致, 不一致=旧镜像未重建
+  EXPECTED_LLM_MODEL: qwen-plus
+  UA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
 jobs:
   keepalive:
     runs-on: ubuntu-latest
     steps:
-      - name: Ping ModelScope Studio
+      - name: Ping + version check + self-heal deploy
         env:
-          UA: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+          MS_TOKEN: ${{ secrets.MODELSCOPE_API_KEY }}
         run: |
           echo "=== Keepalive $(date -u) ==="
 
-          # 1. Ping ModelScope Studio page (trigger container start if sleeping)
+          # 1. 查询 Studio 构建状态 (非 Running 且非 Building 中 => 需要重新部署)
+          NEED_DEPLOY=0
+          STUDIO_JSON=$(curl -s --max-time 30 -H "User-Agent: $UA" \
+            -H "Authorization: Bearer $MS_TOKEN" \
+            "https://modelscope.cn/openapi/v1/studios/$MS_OWNER/$MS_REPO" || true)
+          STUDIO_STATUS=$(echo "$STUDIO_JSON" | jq -r '.data.status // "unknown"' 2>/dev/null || echo "unknown")
+          echo "Studio status: $STUDIO_STATUS"
+          if [ "$STUDIO_STATUS" != "Running" ] && [ "$STUDIO_STATUS" != "Building" ]; then
+            echo "⚠️ Studio neither Running nor Building -> need deploy"
+            NEED_DEPLOY=1
+          fi
+
+          # 2. Ping ModelScope 页面 (休眠则唤醒)
           PAGE_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
             -H "User-Agent: $UA" \
-            "https://www.modelscope.cn/studios/gsym236998/h2brain")
+            "https://www.modelscope.cn/studios/$MS_OWNER/$MS_REPO" || echo "000")
           echo "ModelScope page: $PAGE_CODE"
-
-          # 2. Wait for container warmup
           sleep 5
 
-          # 3. Ping direct URL (keep container alive)
-          DIRECT_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-            -H "User-Agent: $UA" \
-            "https://gsym236998-h2brain.ms.show")
-          echo "Direct URL: $DIRECT_CODE"
+          # 3. 健康检查 + 版本特征验证 (200 但版本落后 = 旧镜像, 必须识别出来)
+          HEALTH=$(curl -s --max-time 30 -H "User-Agent: $UA" \
+            "https://$MS_OWNER-$MS_REPO.ms.show/api/v1/health" || true)
+          echo "Health: $HEALTH"
+          API_OK=$(echo "$HEALTH" | jq -r '.status // empty' 2>/dev/null || true)
+          LLM_MODEL=$(echo "$HEALTH" | jq -r '.llm_model // empty' 2>/dev/null || true)
+          echo "API status: '${API_OK}' | llm_model: '${LLM_MODEL}' (expected: $EXPECTED_LLM_MODEL)"
 
-          # 4. Ping API health endpoint (keep backend alive)
-          API_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-            -H "User-Agent: $UA" \
-            "https://gsym236998-h2brain.ms.show/api/v1/health")
-          echo "API health: $API_CODE"
-
-          # 5. Ping operations endpoint (keep data endpoint alive)
-          OPS_CODE=$(curl -s -o /dev/null -w "%{http_code}" --max-time 30 \
-            -H "User-Agent: $UA" \
-            "https://gsym236998-h2brain.ms.show/api/v1/operations/summary")
-          echo "Operations API: $OPS_CODE"
-
-          # 6. Summary
-          if [ "$DIRECT_CODE" = "200" ] && [ "$API_CODE" = "200" ]; then
-            echo "✅ Container is alive (frontend + backend)"
-          else
-            echo "⚠️ Frontend: $DIRECT_CODE, Backend: $API_CODE"
+          if [ "$API_OK" != "ok" ]; then
+            echo "⚠️ Health check failed -> need deploy"
+            NEED_DEPLOY=1
           fi
+          if [ -n "$LLM_MODEL" ] && [ "$LLM_MODEL" != "$EXPECTED_LLM_MODEL" ]; then
+            echo "⚠️ Version mismatch: running=$LLM_MODEL expected=$EXPECTED_LLM_MODEL (stale image) -> need deploy"
+            NEED_DEPLOY=1
+          fi
+
+          # 4. 自愈: 触发重建 (Building 中则跳过, 避免重复触发)
+          if [ "$NEED_DEPLOY" = "1" ] && [ "$STUDIO_STATUS" != "Building" ]; then
+            echo "🔄 Triggering self-heal deploy..."
+            DEPLOY_RESP=$(curl -s --max-time 30 -X POST -H "User-Agent: $UA" \
+              -H "Authorization: Bearer $MS_TOKEN" \
+              "https://modelscope.cn/openapi/v1/studios/$MS_OWNER/$MS_REPO/deploy" || true)
+            echo "Deploy response: $DEPLOY_RESP"
+          elif [ "$NEED_DEPLOY" = "1" ]; then
+            echo "⏳ Deploy already in progress (Building), skip"
+          else
+            echo "✅ Container alive + version match, no deploy needed"
+          fi
+
+      - name: Cleanup old workflow runs (keep 1 day)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # 每5分钟一跑=288 run/天, 删除1天前的历史 run 防止 Actions 列表刷爆
+          CUTOFF=$(date -u -d '1 day ago' +%Y-%m-%dT%H:%M:%SZ)
+          echo "Deleting keepalive runs created before $CUTOFF"
+          gh api --paginate -H "Accept: application/vnd.github+json" \
+            "/repos/${GITHUB_REPOSITORY}/actions/workflows/keepalive.yml/runs?per_page=100" \
+            --jq ".workflow_runs[] | select(.created_at < \"${CUTOFF}\") | .id" \
+            | sort -un | while read -r RUN_ID; do
+                echo "Deleting run $RUN_ID"
+                gh api -X DELETE "/repos/${GITHUB_REPOSITORY}/actions/runs/$RUN_ID" || true
+              done
+          echo "Cleanup done"
