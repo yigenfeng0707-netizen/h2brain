@@ -698,7 +698,7 @@ class ReactEngine:
         return llm_client.chat(
             self.messages,
             temperature=0.4,
-            max_tokens=2048,
+            max_tokens=4096,  # 推理模型(如step系列)reasoning占位大,2048会导致JSON截断
         )
 
     def _execute_tool(self, tool_name: str, tool_input: dict) -> str:

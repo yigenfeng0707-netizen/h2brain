@@ -20,7 +20,7 @@ logger = logging.getLogger("h2brain.llm")
 # Retry config - tuned for ModelScope container constraints
 _MAX_RETRIES = 1
 _RETRY_BASE_DELAY = 0.5  # seconds
-_REQUEST_TIMEOUT = 30  # seconds (ReAct prompts are complex, need more time)
+_REQUEST_TIMEOUT = 60  # seconds (推理模型单轮含reasoning需40-50s,30s会中途掐断)
 
 # Circuit breaker: after primary fails, skip it for this cooldown window
 # (avoids wasting ~15s per ReAct iteration on a dead endpoint -> gateway 504)
