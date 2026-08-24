@@ -61,6 +61,19 @@ const ORDER_STATUS_LABELS: Record<string, string> = {
   cancelled: '已取消',
 }
 
+const VEHICLE_STATUS_LABELS: Record<string, string> = {
+  in_transit: '运输中',
+  online: '在线待命',
+  low_hydrogen: '低氢量',
+  offline: '离线',
+}
+
+const STATION_STATUS_LABELS: Record<string, string> = {
+  normal: '正常',
+  maintenance: '维护中',
+  offline: '离线',
+}
+
 export default function Dispatch() {
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [stations, setStations] = useState<Station[]>([])
@@ -85,13 +98,19 @@ export default function Dispatch() {
 
   if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', padding: 100 }} />
 
-  // 加氢站散点图
+  // 加氢站散点图(含车辆,tooltip按类型分流)
   const stationMap = {
     tooltip: {
       trigger: 'item',
       formatter: (p: any) => {
-        const s = p.data
-        return `${s.name}<br/>状态: ${s.status}<br/>储氢: ${s.current_storage}/${s.storage_capacity}kg<br/>排队: ${s.queue_length}辆<br/>等待: ${s.avg_wait_time}min<br/>氢价: ${s.price_per_kg}元/kg`
+        const d = p.data
+        const raw = d.value?.[2] ?? {}
+        if (d.itemType === 'vehicle') {
+          const v = raw as Vehicle
+          return `<b>${v.plate}</b>（${v.model}）<br/>状态: ${VEHICLE_STATUS_LABELS[v.status] || v.status}<br/>司机: ${v.driver_name || '-'} | 车队: ${v.fleet_name || '-'}<br/>氢量: ${v.hydrogen_level}%（约 ${v.range_remaining}km）<br/>百公里氢耗: ${v.hydrogen_consumption}kg`
+        }
+        const s = raw as Station
+        return `<b>${s.name}</b><br/>状态: ${STATION_STATUS_LABELS[s.status] || s.status}<br/>储氢: ${s.current_storage}/${s.storage_capacity}kg<br/>排队: ${s.queue_length}辆 | 等待: ${s.avg_wait_time}min<br/>氢价: ${s.price_per_kg}元/kg`
       },
     },
     xAxis: { type: 'value', name: '经度', min: 116.0, max: 116.8, axisLabel: { color: 'rgba(224,245,232,0.5)' } },
@@ -99,8 +118,10 @@ export default function Dispatch() {
     series: [
       {
         type: 'scatter',
+        name: '加氢站',
         data: stations.map(s => ({
           name: s.name,
+          itemType: 'station',
           value: [s.lng, s.lat, s],
           symbolSize: 20 + s.queue_length * 3,
           itemStyle: {
@@ -110,10 +131,12 @@ export default function Dispatch() {
       },
       {
         type: 'scatter',
+        name: '车辆',
         data: vehicles.map(v => ({
           name: v.plate,
+          itemType: 'vehicle',
           value: [v.lng, v.lat, v],
-          symbolSize: 8,
+          symbolSize: 10,
           itemStyle: {
             color: v.status === 'in_transit' ? '#00E5FF' :
                    v.status === 'online' ? '#69F0AE' :
