@@ -26,7 +26,7 @@ from .mock_data import (
 
 logger = logging.getLogger("h2brain.react")
 
-MAX_ITERATIONS = 3
+MAX_ITERATIONS = 5
 
 # ---------------------------------------------------------------------------
 # Tool definitions - each tool returns a string observation
@@ -611,7 +611,7 @@ You must respond in ONE of two JSON formats:
 6. All responses must be valid JSON. Do not add text outside the JSON block.
 7. Respond in Chinese (the user's language).
 8. The "thought" and "final_answer" values MUST be plain strings (用中文自然语言表述), never nested JSON objects or arrays.
-9. NEVER call the same tool with the same parameters twice — you already have that data in previous observations. If you need a computed value (average, percentage, max, comparison), calculate it yourself from the observations you already collected, then give the final_answer.
+9. NEVER call the same tool with the same parameters twice — you already have that data in previous observations. NEVER invent tool names that are not in the list above (e.g., there is NO math/calculation/average tool). All computed values (averages, percentages, max, comparisons) must be calculated by YOURSELF inside the "thought" field, then give the final_answer.
 10. You only have {MAX_ITERATIONS} actions in total. Plan ahead: query first, analyze the data you got, then answer. Do not waste actions on redundant queries.
 """
 
