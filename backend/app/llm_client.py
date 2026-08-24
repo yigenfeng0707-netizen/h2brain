@@ -22,6 +22,25 @@ _MAX_RETRIES = 1
 _RETRY_BASE_DELAY = 0.5  # seconds
 _REQUEST_TIMEOUT = 30  # seconds (ReAct prompts are complex, need more time)
 
+# Circuit breaker: after primary fails, skip it for this cooldown window
+# (avoids wasting ~15s per ReAct iteration on a dead endpoint -> gateway 504)
+_PRIMARY_COOLDOWN = 60.0
+_primary_failed_at: float | None = None
+
+
+def _primary_available() -> bool:
+    return _primary_failed_at is None or (time.time() - _primary_failed_at) > _PRIMARY_COOLDOWN
+
+
+def _mark_primary_failure() -> None:
+    global _primary_failed_at
+    _primary_failed_at = time.time()
+
+
+def _mark_primary_success() -> None:
+    global _primary_failed_at
+    _primary_failed_at = None
+
 
 class _LLMConfig:
     """Simple config container for an LLM endpoint."""
@@ -208,36 +227,41 @@ def chat(
     if config is None:
         raise RuntimeError("LLM is not configured (LLM_API_KEY is empty)")
 
+    fallback = get_fallback_client()
+    skip_primary = fallback is not None and not _primary_available()
+    if skip_primary:
+        logger.info("Primary LLM in cooldown, using fallback directly")
+
+    if not skip_primary:
+        try:
+            result = _call_with_retries(
+                config,
+                messages,
+                temperature,
+                max_tokens,
+                stream=False,
+            )
+            _mark_primary_success()
+            return result  # type: ignore[return-value]
+
+        except RuntimeError as primary_err:
+            _mark_primary_failure()
+            if fallback is None:
+                raise
+            logger.warning("Primary LLM failed, switching to fallback: %s", primary_err)
+
+    assert fallback is not None
     try:
         result = _call_with_retries(
-            config,
+            fallback,
             messages,
             temperature,
             max_tokens,
             stream=False,
         )
         return result  # type: ignore[return-value]
-
-    except RuntimeError as primary_err:
-        fallback = get_fallback_client()
-        if fallback is None:
-            raise
-
-        logger.warning("Primary LLM failed, switching to fallback: %s", primary_err)
-        try:
-            result = _call_with_retries(
-                fallback,
-                messages,
-                temperature,
-                max_tokens,
-                stream=False,
-            )
-            return result  # type: ignore[return-value]
-        except RuntimeError as fallback_err:
-            raise RuntimeError(
-                f"Both primary and fallback LLM failed. "
-                f"Primary: {primary_err} | Fallback: {fallback_err}"
-            )
+    except RuntimeError as fallback_err:
+        raise RuntimeError(f"Both primary and fallback LLM failed. Fallback: {fallback_err}")
 
 
 def chat_stream(
@@ -254,34 +278,41 @@ def chat_stream(
     if config is None:
         raise RuntimeError("LLM is not configured (LLM_API_KEY is empty)")
 
-    try:
-        yield from _call_with_retries(  # type: ignore[misc]
-            config,
-            messages,
-            temperature,
-            max_tokens,
-            stream=True,
-        )
-        return  # Success
+    fallback = get_fallback_client()
+    skip_primary = fallback is not None and not _primary_available()
+    if skip_primary:
+        logger.info("Primary LLM in cooldown, using fallback stream directly")
 
-    except RuntimeError as primary_err:
-        fallback = get_fallback_client()
-        if fallback is None:
-            raise
-
-        logger.warning(
-            "Primary LLM stream failed, switching to fallback: %s", primary_err
-        )
+    if not skip_primary:
         try:
             yield from _call_with_retries(  # type: ignore[misc]
-                fallback,
+                config,
                 messages,
                 temperature,
                 max_tokens,
                 stream=True,
             )
-        except RuntimeError as fallback_err:
-            raise RuntimeError(
-                f"Both primary and fallback LLM stream failed. "
-                f"Primary: {primary_err} | Fallback: {fallback_err}"
+            _mark_primary_success()
+            return  # Success
+
+        except RuntimeError as primary_err:
+            _mark_primary_failure()
+            if fallback is None:
+                raise
+            logger.warning(
+                "Primary LLM stream failed, switching to fallback: %s", primary_err
             )
+
+    assert fallback is not None
+    try:
+        yield from _call_with_retries(  # type: ignore[misc]
+            fallback,
+            messages,
+            temperature,
+            max_tokens,
+            stream=True,
+        )
+    except RuntimeError as fallback_err:
+        raise RuntimeError(
+            f"Both primary and fallback LLM stream failed. Fallback: {fallback_err}"
+        )
