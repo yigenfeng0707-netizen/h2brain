@@ -46,16 +46,16 @@ ENV DEBUG=false
 ENV H2BRAIN_DATA_DIR=/app/data
 
 # Overwrite .env with production values (avoid local dev .env leaking into container)
-# Primary: openai-next (容器内可达,1.8s响应) / Fallback: SenseNova (本地可达,容器内超时)
+# Primary: openai-next gpt-4o-mini / Fallback: openai-next 按量 gpt-5.6-sol (奇绩算力)
 RUN echo 'APP_ENV=production' > /app/backend/.env && \
     echo 'DEBUG=false' >> /app/backend/.env && \
     echo 'CORS_ORIGINS=["*"]' >> /app/backend/.env && \
     echo 'LLM_API_KEY=sk-ghfkYiYWryR3Px5HC4Be6fBc330640F9B9A4952f10A95763' >> /app/backend/.env && \
     echo 'LLM_BASE_URL=https://api.openai-next.com/v1' >> /app/backend/.env && \
     echo 'LLM_MODEL=gpt-4o-mini' >> /app/backend/.env && \
-    echo 'LLM_FALLBACK_API_KEY=sk-bulmEVxNZokZedif4sxINRbv5hbD7SVd' >> /app/backend/.env && \
-    echo 'LLM_FALLBACK_BASE_URL=https://token.sensenova.cn/v1' >> /app/backend/.env && \
-    echo 'LLM_FALLBACK_MODEL=sensenova-6.8-flash-lite' >> /app/backend/.env
+    echo 'LLM_FALLBACK_API_KEY=sk-H6Um1v2aEow1BF5XCb288e9d9f29454599Af16C1Ab9bEf5c' >> /app/backend/.env && \
+    echo 'LLM_FALLBACK_BASE_URL=https://api.openai-next.com/v1' >> /app/backend/.env && \
+    echo 'LLM_FALLBACK_MODEL=gpt-5.6-sol' >> /app/backend/.env
 
 EXPOSE 7860
 
