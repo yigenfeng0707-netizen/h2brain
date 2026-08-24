@@ -223,6 +223,18 @@ function fmtGPS(gps: [number, number]): string {
   return `${gps[0].toFixed(4)}, ${gps[1].toFixed(4)}`
 }
 
+/** 根据背景色亮度返回黑或白文字色，保证对比度 */
+function getContrastColor(hex: string): string {
+  if (!hex || !hex.startsWith('#')) return '#fff'
+  const c = hex.replace('#', '')
+  const r = parseInt(c.substring(0, 2), 16)
+  const g = parseInt(c.substring(2, 4), 16)
+  const b = parseInt(c.substring(4, 6), 16)
+  // 相对亮度 (WCAG 简化版)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  return luminance > 0.55 ? '#1a1a1a' : '#fff'
+}
+
 // ---- Chart Background Bands ----
 function buildMarkAreas(bands: { start_min: number; end_min: number; color: string }[]) {
   return bands.map((b) => [
@@ -417,7 +429,12 @@ function RoadTable({ segments }: { segments: RoadSegment[] }) {
       title: '路况',
       dataIndex: 'road_type',
       render: (text: string, r: RoadSegment) => (
-        <Tag color={r.color} style={{ color: '#fff' }}>
+        <Tag style={{
+          backgroundColor: r.color,
+          color: getContrastColor(r.color),
+          border: 'none',
+          fontWeight: 600,
+        }}>
           {text}
         </Tag>
       ),
@@ -478,8 +495,9 @@ function ColorBar({ bands }: { bands: RoadBand[] }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              fontSize: 10,
-              color: '#fff',
+              fontSize: 11,
+              fontWeight: 600,
+              color: getContrastColor(b.color),
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}
@@ -505,7 +523,12 @@ function ModeTable({ modes }: { modes: PowerMode[] }) {
       title: '动力模式',
       dataIndex: 'mode',
       render: (text: string, r: PowerMode) => (
-        <Tag color={r.color} style={{ color: '#fff' }}>
+        <Tag style={{
+          backgroundColor: r.color,
+          color: getContrastColor(r.color),
+          border: 'none',
+          fontWeight: 600,
+        }}>
           {text}
         </Tag>
       ),
@@ -834,7 +857,7 @@ export default function TripAnalysis() {
               <div
                 style={{
                   display: 'flex',
-                  height: 20,
+                  height: 22,
                   borderRadius: 4,
                   overflow: 'hidden',
                   marginBottom: 8,
@@ -853,8 +876,9 @@ export default function TripAnalysis() {
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        fontSize: 9,
-                        color: '#fff',
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: getContrastColor(b.color),
                         overflow: 'hidden',
                       }}
                       title={`${b.mode} (${fmtNum(b.start_min, 0)}~${fmtNum(b.end_min, 0)}min)`}

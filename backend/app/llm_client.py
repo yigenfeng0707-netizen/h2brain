@@ -20,9 +20,9 @@ _client: OpenAI | None = None
 _fallback_client: OpenAI | None = None
 
 # Retry config
-_MAX_RETRIES = 3
+_MAX_RETRIES = 2
 _RETRY_BASE_DELAY = 1.0  # seconds
-_REQUEST_TIMEOUT = 30  # seconds
+_REQUEST_TIMEOUT = 20  # seconds
 
 
 def get_client() -> OpenAI | None:

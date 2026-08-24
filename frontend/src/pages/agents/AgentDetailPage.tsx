@@ -21,6 +21,7 @@ interface ChatMessage {
   role: 'user' | 'agent'
   content: string
   timestamp: string
+  offline?: boolean
 }
 
 // Preset questions per agent type
@@ -98,15 +99,17 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
         || result.response
         || result.summary
         || JSON.stringify(result, null, 2)
+      const isOffline = res.data?.llm_enabled === false
       setMessages(prev => [...prev, {
         role: 'agent',
         content: typeof agentReply === 'string' ? agentReply : JSON.stringify(agentReply, null, 2),
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
+        offline: isOffline,
       }])
     } catch {
       setMessages(prev => [...prev, {
         role: 'agent',
-        content: '抱歉，智能体执行出错。请检查后端服务是否正常运行。',
+        content: '智能体响应超时，正在以离线模式返回分析结果。请稍后重试或检查网络连接。',
         timestamp: new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }),
       }])
     } finally {
@@ -250,6 +253,9 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
                     </Paragraph>
                     <Text style={{ fontSize: 10, color: 'rgba(224,245,232,0.25)' }}>
                       {msg.timestamp}
+                      {msg.offline && (
+                        <span style={{ marginLeft: 6, color: 'rgba(255,152,0,0.7)' }}>· 离线模式</span>
+                      )}
                     </Text>
                   </div>
                 </div>
