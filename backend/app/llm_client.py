@@ -1,23 +1,21 @@
 """H2Brain - LLM Client Wrapper
 
-Encapsulates OpenAI-compatible SDK calls (GLM-4 / OpenAI / etc).
+Uses httpx directly (not OpenAI SDK) to avoid proxy/env issues in ModelScope containers.
 Provides synchronous chat and streaming chat with retry, timeout, and fallback.
 """
 
 from __future__ import annotations
 
 import time
+import json
 import logging
 from typing import Iterator
 
-from openai import OpenAI, APIError, APITimeoutError, RateLimitError
+import httpx
 
 from .config import settings
 
 logger = logging.getLogger("h2brain.llm")
-
-_client: OpenAI | None = None
-_fallback_client: OpenAI | None = None
 
 # Retry config - tuned for ModelScope container constraints
 _MAX_RETRIES = 1
@@ -25,47 +23,61 @@ _RETRY_BASE_DELAY = 0.5  # seconds
 _REQUEST_TIMEOUT = 30  # seconds (ReAct prompts are complex, need more time)
 
 
-def get_client() -> OpenAI | None:
-    """Return a singleton OpenAI client, or None if LLM is not configured."""
-    global _client
-    if not settings.llm_enabled:
-        return None
-    if _client is None:
-        _client = OpenAI(
+class _LLMConfig:
+    """Simple config container for an LLM endpoint."""
+
+    def __init__(self, api_key: str, base_url: str, model: str):
+        self.api_key = api_key
+        # Ensure base_url ends with /v1 (no trailing slash)
+        self.base_url = base_url.rstrip("/")
+        self.model = model
+
+
+_primary: _LLMConfig | None = None
+_fallback: _LLMConfig | None = None
+
+
+def _init_configs():
+    """Initialize LLM configs from settings."""
+    global _primary, _fallback
+    if _primary is None and settings.llm_enabled:
+        _primary = _LLMConfig(
             api_key=settings.llm_api_key,
             base_url=settings.llm_base_url,
-            timeout=_REQUEST_TIMEOUT,
+            model=settings.llm_model,
         )
         logger.info(
-            "LLM client initialized: base_url=%s model=%s",
-            settings.llm_base_url,
-            settings.llm_model,
+            "LLM primary config: base_url=%s model=%s",
+            _primary.base_url,
+            _primary.model,
         )
-    return _client
-
-
-def get_fallback_client() -> OpenAI | None:
-    """Return a singleton fallback OpenAI client, or None if not configured."""
-    global _fallback_client
-    if not settings.llm_fallback_enabled:
-        return None
-    if _fallback_client is None:
-        _fallback_client = OpenAI(
+    if _fallback is None and settings.llm_fallback_enabled:
+        _fallback = _LLMConfig(
             api_key=settings.llm_fallback_api_key,
             base_url=settings.llm_fallback_base_url,
-            timeout=_REQUEST_TIMEOUT,
+            model=settings.llm_fallback_model,
         )
         logger.info(
-            "LLM fallback client initialized: base_url=%s model=%s",
-            settings.llm_fallback_base_url,
-            settings.llm_fallback_model,
+            "LLM fallback config: base_url=%s model=%s",
+            _fallback.base_url,
+            _fallback.model,
         )
-    return _fallback_client
+
+
+def get_client() -> _LLMConfig | None:
+    """Return primary LLM config, or None if not configured."""
+    _init_configs()
+    return _primary
+
+
+def get_fallback_client() -> _LLMConfig | None:
+    """Return fallback LLM config, or None if not configured."""
+    _init_configs()
+    return _fallback
 
 
 def _call_with_retries(
-    client: OpenAI,
-    model: str,
+    config: _LLMConfig,
     messages: list[dict[str, str]],
     temperature: float,
     max_tokens: int,
@@ -78,40 +90,67 @@ def _call_with_retries(
     last_error: Exception | None = None
     for attempt in range(1, _MAX_RETRIES + 1):
         try:
+            url = f"{config.base_url}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {config.api_key}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": config.model,
+                "messages": messages,
+                "temperature": temperature,
+                "max_tokens": max_tokens,
+            }
+
             if stream:
-                stream_resp = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
-                    stream=True,
-                )
-                return _stream_generator(stream_resp)
+                payload["stream"] = True
+                return _stream_via_httpx(url, headers, payload)
             else:
-                resp = client.chat.completions.create(
-                    model=model,
-                    messages=messages,
-                    temperature=temperature,
-                    max_tokens=max_tokens,
+                resp = httpx.post(
+                    url,
+                    headers=headers,
+                    json=payload,
+                    timeout=_REQUEST_TIMEOUT,
                 )
-                content = resp.choices[0].message.content
+                if resp.status_code != 200:
+                    raise RuntimeError(
+                        f"LLM API returned {resp.status_code}: {resp.text[:300]}"
+                    )
+                data = resp.json()
+                content = data["choices"][0]["message"]["content"]
                 if not content:
                     raise RuntimeError("LLM returned empty content")
                 return content.strip()
 
-        except (APITimeoutError, RateLimitError) as e:
+        except httpx.TimeoutException as e:
             last_error = e
             delay = _RETRY_BASE_DELAY * attempt
             logger.warning(
-                "LLM call attempt %d/%d failed (%s), retrying in %.1fs",
+                "LLM call attempt %d/%d timed out, retrying in %.1fs",
                 attempt,
                 _MAX_RETRIES,
-                type(e).__name__,
                 delay,
             )
             time.sleep(delay)
 
-        except APIError as e:
+        except httpx.HTTPError as e:
+            last_error = e
+            logger.error("LLM HTTP error (attempt %d): %s", attempt, e)
+            if attempt < _MAX_RETRIES:
+                time.sleep(_RETRY_BASE_DELAY)
+            else:
+                break
+
+        except (KeyError, IndexError, json.JSONDecodeError) as e:
+            last_error = e
+            logger.error("LLM response parse error (attempt %d): %s", attempt, e)
+            if attempt < _MAX_RETRIES:
+                time.sleep(_RETRY_BASE_DELAY)
+            else:
+                break
+
+        except RuntimeError as e:
+            # Non-200 status code or empty content
             last_error = e
             logger.error("LLM API error (attempt %d): %s", attempt, e)
             if attempt < _MAX_RETRIES:
@@ -122,12 +161,37 @@ def _call_with_retries(
     raise RuntimeError(f"LLM call failed after {_MAX_RETRIES} retries: {last_error}")
 
 
-def _stream_generator(stream_resp) -> Iterator[str]:
-    """Convert a stream response to a generator yielding content deltas."""
-    for chunk in stream_resp:
-        delta = chunk.choices[0].delta.content
-        if delta:
-            yield delta
+def _stream_via_httpx(
+    url: str,
+    headers: dict[str, str],
+    payload: dict,
+) -> Iterator[str]:
+    """Stream chat completion via httpx, yielding content deltas."""
+    with httpx.Client(timeout=_REQUEST_TIMEOUT) as client:
+        with client.stream(
+            "POST",
+            url,
+            headers=headers,
+            json=payload,
+        ) as resp:
+            if resp.status_code != 200:
+                body = resp.read().decode("utf-8", errors="replace")
+                raise RuntimeError(
+                    f"LLM stream API returned {resp.status_code}: {body[:300]}"
+                )
+            for line in resp.iter_lines():
+                if not line or not line.startswith("data: "):
+                    continue
+                data_str = line[6:]  # Remove "data: " prefix
+                if data_str.strip() == "[DONE]":
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    delta = chunk["choices"][0]["delta"].get("content")
+                    if delta:
+                        yield delta
+                except (json.JSONDecodeError, KeyError, IndexError):
+                    continue
 
 
 def chat(
@@ -140,14 +204,13 @@ def chat(
     Tries primary LLM first; if all retries fail and fallback is configured,
     tries fallback LLM. Raises RuntimeError if both fail.
     """
-    client = get_client()
-    if client is None:
+    config = get_client()
+    if config is None:
         raise RuntimeError("LLM is not configured (LLM_API_KEY is empty)")
 
     try:
         result = _call_with_retries(
-            client,
-            settings.llm_model,
+            config,
             messages,
             temperature,
             max_tokens,
@@ -156,15 +219,14 @@ def chat(
         return result  # type: ignore[return-value]
 
     except RuntimeError as primary_err:
-        fallback_client = get_fallback_client()
-        if fallback_client is None:
+        fallback = get_fallback_client()
+        if fallback is None:
             raise
 
         logger.warning("Primary LLM failed, switching to fallback: %s", primary_err)
         try:
             result = _call_with_retries(
-                fallback_client,
-                settings.llm_fallback_model,
+                fallback,
                 messages,
                 temperature,
                 max_tokens,
@@ -188,14 +250,13 @@ def chat_stream(
     Tries primary LLM first; if all retries fail and fallback is configured,
     tries fallback LLM. Raises RuntimeError if both fail.
     """
-    client = get_client()
-    if client is None:
+    config = get_client()
+    if config is None:
         raise RuntimeError("LLM is not configured (LLM_API_KEY is empty)")
 
     try:
         yield from _call_with_retries(  # type: ignore[misc]
-            client,
-            settings.llm_model,
+            config,
             messages,
             temperature,
             max_tokens,
@@ -204,8 +265,8 @@ def chat_stream(
         return  # Success
 
     except RuntimeError as primary_err:
-        fallback_client = get_fallback_client()
-        if fallback_client is None:
+        fallback = get_fallback_client()
+        if fallback is None:
             raise
 
         logger.warning(
@@ -213,8 +274,7 @@ def chat_stream(
         )
         try:
             yield from _call_with_retries(  # type: ignore[misc]
-                fallback_client,
-                settings.llm_fallback_model,
+                fallback,
                 messages,
                 temperature,
                 max_tokens,
