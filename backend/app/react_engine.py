@@ -611,6 +611,8 @@ You must respond in ONE of two JSON formats:
 6. All responses must be valid JSON. Do not add text outside the JSON block.
 7. Respond in Chinese (the user's language).
 8. The "thought" and "final_answer" values MUST be plain strings (用中文自然语言表述), never nested JSON objects or arrays.
+9. NEVER call the same tool with the same parameters twice — you already have that data in previous observations. If you need a computed value (average, percentage, max, comparison), calculate it yourself from the observations you already collected, then give the final_answer.
+10. You only have {MAX_ITERATIONS} actions in total. Plan ahead: query first, analyze the data you got, then answer. Do not waste actions on redundant queries.
 """
 
 
@@ -796,7 +798,7 @@ class ReactEngine:
             self.messages.append(
                 {
                     "role": "user",
-                    "content": f"Observation: {observation}\n\nContinue your analysis. If you have enough information, provide the final_answer.",
+                    "content": f"Observation: {observation}\n\nYou have {MAX_ITERATIONS - iteration - 1} action(s) left. Do NOT repeat any previous tool call — that data is already above. Either call a DIFFERENT tool for genuinely missing information, or directly provide the final_answer now (compute averages/percentages/comparisons yourself from the observations).",
                 }
             )
 
@@ -908,7 +910,7 @@ class ReactEngine:
             self.messages.append(
                 {
                     "role": "user",
-                    "content": f"Observation: {observation}\n\nContinue your analysis. If you have enough information, provide the final_answer.",
+                    "content": f"Observation: {observation}\n\nYou have {MAX_ITERATIONS - iteration - 1} action(s) left. Do NOT repeat any previous tool call — that data is already above. Either call a DIFFERENT tool for genuinely missing information, or directly provide the final_answer now (compute averages/percentages/comparisons yourself from the observations).",
                 }
             )
 
