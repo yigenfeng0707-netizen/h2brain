@@ -11,7 +11,6 @@ from __future__ import annotations
 import json
 import logging
 import re
-from datetime import datetime
 from typing import Generator, Callable
 
 from . import llm_client
@@ -204,7 +203,7 @@ def _tool_query_kpi(params: dict) -> str:
         real_kpi_lines.append(f"  [Real] data unavailable: {e}")
 
     lines = [
-        f"Fleet KPI (Simulated):",
+        "Fleet KPI (Simulated):",
         f"  Vehicles: {k.vehicles_total} (online={k.vehicles_online}, in_transit={k.vehicles_in_transit})",
         f"  Fleets: {k.fleets}",
         f"  Orders Today: {k.orders_today}",
@@ -214,7 +213,7 @@ def _tool_query_kpi(params: dict) -> str:
         f"  Fuel Cell Avg Health: {k.fuel_cell_avg_health}%",
         f"  Cost Saved Today: {k.cost_saved_today} yuan",
         f"  Carbon Reduction: {k.carbon_reduction} kg CO2",
-        f"\nReal Telemetry KPI:",
+        "\nReal Telemetry KPI:",
     ]
     lines.extend(real_kpi_lines)
     return "\n".join(lines)
@@ -380,7 +379,7 @@ def _tool_analyze_fuelcell_health(params: dict) -> str:
             f"  Efficiency: {report.get('efficiency_analysis', {}).get('stack_efficiency_pct', '?')}%",
             f"  Degradation: {report.get('degradation_trend', {}).get('interpretation', '?')}",
             f"  RUL: {report.get('rul_estimate', {}).get('remaining_hours', '?')}h",
-            f"\n  Recommendations:",
+            "\n  Recommendations:",
         ]
         for rec in report.get("recommendations", []):
             lines.append(f"    - {rec}")
@@ -447,7 +446,7 @@ def _tool_schedule_station_dispatch(params: dict) -> str:
         lines = [
             f"Station Dispatch for {vehicle_plate}:\n",
             f"  Stations evaluated: {result.get('stations_evaluated', 0)}",
-            f"\n  Top recommendation:",
+            "\n  Top recommendation:",
             f"    Station: {rec.get('name', '?')} ({rec.get('station_id', '?')})",
             f"    Distance: {rec.get('distance_km', '?')}km",
             f"    Queue: {rec.get('queue_length', '?')} vehicles | Wait: ~{rec.get('predicted_wait_min', '?')}min",
@@ -611,6 +610,7 @@ You must respond in ONE of two JSON formats:
 5. The final_answer should be detailed, specific, and include data from your observations.
 6. All responses must be valid JSON. Do not add text outside the JSON block.
 7. Respond in Chinese (the user's language).
+8. The "thought" and "final_answer" values MUST be plain strings (用中文自然语言表述), never nested JSON objects or arrays.
 """
 
 
@@ -645,6 +645,17 @@ def _extract_json(text: str) -> dict | None:
             return json.loads(json_str)
         except json.JSONDecodeError:
             return None
+
+
+def _coerce_str(value) -> str:
+    """LLM 有时会把 thought/final_answer 返回成 dict/list 而非字符串，
+    统一转成字符串，避免 ReactStep/ReactResponse 的 Pydantic 校验失败。"""
+    if isinstance(value, str):
+        return value
+    try:
+        return json.dumps(value, ensure_ascii=False)
+    except (TypeError, ValueError):
+        return str(value)
 
 
 # ---------------------------------------------------------------------------
@@ -735,11 +746,11 @@ class ReactEngine:
                 )
                 continue
 
-            thought = parsed.get("thought", "")
+            thought = _coerce_str(parsed.get("thought", ""))
 
             # Check if this is a final answer
             if "final_answer" in parsed:
-                final_answer = parsed["final_answer"]
+                final_answer = _coerce_str(parsed["final_answer"])
                 # Record the last thought as a step if we haven't recorded it
                 if thought and not any(s.thought == thought for s in self.steps):
                     self.steps.append(
@@ -839,10 +850,10 @@ class ReactEngine:
                 )
                 continue
 
-            thought = parsed.get("thought", "")
+            thought = _coerce_str(parsed.get("thought", ""))
 
             if "final_answer" in parsed:
-                final_answer = parsed["final_answer"]
+                final_answer = _coerce_str(parsed["final_answer"])
                 if thought and not any(s.thought == thought for s in self.steps):
                     step = ReactStep(
                         thought=thought,
