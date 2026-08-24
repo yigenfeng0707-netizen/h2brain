@@ -27,7 +27,7 @@ from .mock_data import (
 
 logger = logging.getLogger("h2brain.react")
 
-MAX_ITERATIONS = 6
+MAX_ITERATIONS = 3
 
 # ---------------------------------------------------------------------------
 # Tool definitions - each tool returns a string observation
@@ -604,7 +604,7 @@ You must respond in ONE of two JSON formats:
 ```
 
 ## Rules
-1. Always think step by step. Use tools to gather data before answering.
+1. Be efficient. If you already have enough context to answer directly, give the final_answer immediately without tool calls.
 2. You can take at most {MAX_ITERATIONS} actions. After gathering enough data, give the final answer.
 3. Action names must be one of the tools listed above.
 4. action_input must be a JSON object with the required parameters.
