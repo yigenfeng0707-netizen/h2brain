@@ -36,6 +36,70 @@ VEHICLE_LIFETIME_YEARS = 8
 H2_TRUCK_PREMIUM_YUAN = 300_000  # ~30万 premium
 
 
+def _sensitivity_analysis(
+    total_km: float,
+    total_h2_kg: float,
+    vehicle_count: int,
+) -> dict[str, Any]:
+    """敏感性分析：固定实测单位经济性，单变量扫描行业参数。
+
+    方法说明（可解释性）：
+    - 每公里氢耗 = total_h2_kg / total_km（实测值，不随情景变化）
+    - 每公里柴油等效油耗 = 30 L/100km（行业参数）
+    - 年度节省 = (柴油燃料+柴油维保) - (氢燃料+氢维保)，按扫描情景重算
+    - 回收期 = 购车溢价总额 / 年度节省；生命周期净节省 = 年度节省 × 8 - 溢价
+    - 每次只动一个变量（氢价/柴油价/年里程），其余取基准值
+    """
+    total_premium = H2_TRUCK_PREMIUM_YUAN * vehicle_count
+    h2_kg_per_km = total_h2_kg / total_km if total_km > 0 else 0
+    diesel_l_per_km = DIESEL_CONSUMPTION_L_PER_100KM / 100
+
+    def _metrics(annual_km: float, h2_price: float, diesel_price: float) -> dict:
+        h2_fuel = h2_kg_per_km * annual_km * h2_price
+        diesel_fuel = diesel_l_per_km * annual_km * diesel_price
+        h2_maint = annual_km * H2_MAINTENANCE_YUAN_PER_KM
+        diesel_maint = annual_km * DIESEL_MAINTENANCE_YUAN_PER_KM
+        annual_saved = (diesel_fuel + diesel_maint) - (h2_fuel + h2_maint)
+        payback = total_premium / annual_saved if annual_saved > 0 else None
+        return {
+            "annual_cost_saved_yuan": round(annual_saved, 0),
+            "payback_years": round(payback, 1) if payback is not None else None,
+            "lifetime_savings_yuan": round(
+                annual_saved * VEHICLE_LIFETIME_YEARS - total_premium, 0
+            ),
+        }
+
+    def _scan(name: str, unit: str, values: list[float], kind: str) -> dict:
+        rows = []
+        for v in values:
+            if kind == "h2_price":
+                m = _metrics(
+                    ANNUAL_MILEAGE_KM * vehicle_count, v, DIESEL_PRICE_YUAN_PER_L
+                )
+            elif kind == "diesel_price":
+                m = _metrics(
+                    ANNUAL_MILEAGE_KM * vehicle_count, H2_PRICE_YUAN_PER_KG, v
+                )
+            else:  # annual mileage per vehicle
+                m = _metrics(v * vehicle_count, H2_PRICE_YUAN_PER_KG, DIESEL_PRICE_YUAN_PER_L)
+            rows.append({"value": v, **m})
+        return {"variable": name, "unit": unit, "rows": rows}
+
+    return {
+        "method": (
+            f"固定实测单位经济性（百公里氢耗 {h2_kg_per_km * 100:.2f} kg/100km、"
+            f"柴油 {DIESEL_CONSUMPTION_L_PER_100KM:.0f} L/100km），"
+            "单变量扫描行业参数，其余参数取基准值（氢价 35 元/kg、柴油 7.5 元/L、"
+            "年里程 10 万 km/辆、寿命 8 年、购车溢价 30 万/辆）"
+        ),
+        "h2_price": _scan("氢价", "元/kg", [25, 27.5, 30, 32.5, 35, 37.5, 40], "h2_price"),
+        "diesel_price": _scan("柴油价", "元/L", [6.0, 6.5, 7.0, 7.5, 8.0, 8.5], "diesel_price"),
+        "annual_mileage": _scan(
+            "单车辆年里程", "万 km", [60_000, 80_000, 100_000, 120_000, 150_000], "mileage"
+        ),
+    }
+
+
 def compute_value_analysis(
     vehicles: list[dict[str, Any]],
     trips: list[dict[str, Any]],
@@ -235,4 +299,6 @@ def compute_value_analysis(
         },
         # Per-vehicle breakdown
         "per_vehicle": per_vehicle,
+        # Sensitivity analysis (single-variable sweeps of industry parameters)
+        "sensitivity": _sensitivity_analysis(total_km, total_h2_kg, vehicle_count),
     }

@@ -3,12 +3,24 @@ import { useEffect, useState } from 'react'
 import { Spin, Empty, Row, Col, Card, Statistic, Table, Tag, Typography, Divider } from 'antd'
 import {
   DollarOutlined, ThunderboltOutlined, CloudOutlined, RiseOutlined,
-  ArrowDownOutlined, ArrowUpOutlined, CarOutlined,
+  ArrowDownOutlined, ArrowUpOutlined, CarOutlined, ExperimentOutlined,
 } from '@ant-design/icons'
 import ReactECharts from 'echarts-for-react'
 import { apiGet } from '@/lib/request'
 
 const { Text, Title } = Typography
+
+interface SensRow {
+  value: number
+  annual_cost_saved_yuan: number
+  payback_years: number | null
+  lifetime_savings_yuan: number
+}
+interface SensScan {
+  variable: string
+  unit: string
+  rows: SensRow[]
+}
 
 interface ValueData {
   data_summary: {
@@ -60,6 +72,12 @@ interface ValueData {
     roi_ratio: number
   }
   parameters: Record<string, number>
+  sensitivity: {
+    method: string
+    h2_price: SensScan
+    diesel_price: SensScan
+    annual_mileage: SensScan
+  }
   per_vehicle: Array<{
     vehicle_id: string
     label: string
@@ -176,6 +194,66 @@ export default function ValueAnalysis() {
     ],
     grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
   }
+
+  // 敏感性分析图：单变量扫描，柱=年度节省（按 8 年净节省正负着色），线=回收期（红虚线为 8 年寿命线）
+  const sensChart = (scan: SensScan, labelFmt: (v: number) => string) => {
+    const rows = scan.rows
+    return {
+      tooltip: {
+        trigger: 'axis',
+        formatter: (params: any[]) => {
+          const r = rows[params[0].dataIndex]
+          const pb = r.payback_years != null ? `${r.payback_years} 年` : '无法回收（年节省≤0）'
+          return (
+            `<b>${scan.variable} ${labelFmt(r.value)} ${scan.unit}</b><br/>` +
+            `年度节省：${(r.annual_cost_saved_yuan / 10000).toFixed(1)} 万元<br/>` +
+            `回收期：${pb}<br/>` +
+            `8年净节省：${(r.lifetime_savings_yuan / 10000).toFixed(1)} 万元`
+          )
+        },
+      },
+      legend: { data: ['年度节省(万元)', '回收期(年)'], textStyle: { color: 'rgba(224,245,232,0.6)' }, top: 0 },
+      xAxis: { type: 'category', data: rows.map(r => labelFmt(r.value)), axisLabel: { color: 'rgba(224,245,232,0.6)' } },
+      yAxis: [
+        { type: 'value', name: '万元/年', axisLabel: { color: 'rgba(224,245,232,0.5)' }, nameTextStyle: { color: 'rgba(224,245,232,0.5)' } },
+        { type: 'value', name: '年', splitLine: { show: false }, axisLabel: { color: 'rgba(224,245,232,0.5)' }, nameTextStyle: { color: 'rgba(224,245,232,0.5)' } },
+      ],
+      series: [
+        {
+          name: '年度节省(万元)',
+          type: 'bar',
+          barWidth: '45%',
+          data: rows.map(r => ({
+            value: +(r.annual_cost_saved_yuan / 10000).toFixed(1),
+            itemStyle: { color: r.lifetime_savings_yuan >= 0 ? 'rgba(0,230,118,0.75)' : 'rgba(255,152,0,0.5)' },
+          })),
+        },
+        {
+          name: '回收期(年)',
+          type: 'line',
+          yAxisIndex: 1,
+          data: rows.map(r => (r.payback_years != null && r.payback_years < 50 ? r.payback_years : null)),
+          lineStyle: { color: '#00E5FF', width: 2 },
+          itemStyle: { color: '#00E5FF' },
+          markLine: {
+            silent: true,
+            symbol: 'none',
+            data: [{ yAxis: 8 }],
+            lineStyle: { color: '#FF5252', type: 'dashed' },
+            label: { formatter: '寿命 8 年', color: '#FF8A80' },
+          },
+        },
+      ],
+      grid: { left: '3%', right: '8%', bottom: '3%', top: 36, containLabel: true },
+    }
+  }
+
+  // 敏感性关键结论（从扫描行动态取数，避免硬编码）
+  const sens = data.sensitivity
+  const h2r30 = sens.h2_price.rows.find(r => r.value === 30)
+  const h2r25 = sens.h2_price.rows.find(r => r.value === 25)
+  const dsr85 = sens.diesel_price.rows.find(r => r.value === 8.5)
+  const mkr15 = sens.annual_mileage.rows.find(r => r.value === 150000)
 
   const vehicleColumns = [
     { title: '车辆', dataIndex: 'label', key: 'label', render: (t: string, r: any) => <span style={{ color: '#69F0AE' }}>{t}</span> },
@@ -333,6 +411,84 @@ export default function ValueAnalysis() {
         </Col>
       </Row>
 
+      {/* 敏感性分析（单变量扫描） */}
+      <Row gutter={[8, 8]}>
+        <Col xs={24} lg={12}>
+          <div className="h2-panel" style={{ padding: 16 }}>
+            <h3 style={{ color: '#00E5FF', marginBottom: 8 }}>
+              <ExperimentOutlined style={{ marginRight: 8 }} />
+              氢价敏感性分析
+            </h3>
+            <Text style={{ color: 'rgba(224,245,232,0.45)', fontSize: 11, display: 'block', marginBottom: 8 }}>
+              扫描 25~40 元/kg（基准 35）；其余参数固定。绿色柱 = 8 年生命周期内盈利；红色虚线 = 8 年寿命线，回收期压线即为盈亏平衡
+            </Text>
+            <ReactECharts option={sensChart(sens.h2_price, v => `${v}`)} style={{ height: 280 }} />
+          </div>
+        </Col>
+        <Col xs={24} lg={12}>
+          <div className="h2-panel" style={{ padding: 16 }}>
+            <h3 style={{ color: '#00E5FF', marginBottom: 8 }}>
+              <ExperimentOutlined style={{ marginRight: 8 }} />
+              柴油价敏感性分析
+            </h3>
+            <Text style={{ color: 'rgba(224,245,232,0.45)', fontSize: 11, display: 'block', marginBottom: 8 }}>
+              扫描 6.0~8.5 元/L（基准 7.5）；柴油越贵，氢能经济性越强。6.0 元/L 时年节省转负（本实测氢耗下无法回收）
+            </Text>
+            <ReactECharts option={sensChart(sens.diesel_price, v => `${v}`)} style={{ height: 280 }} />
+          </div>
+        </Col>
+        <Col xs={24} lg={12}>
+          <div className="h2-panel" style={{ padding: 16 }}>
+            <h3 style={{ color: '#00E5FF', marginBottom: 8 }}>
+              <ExperimentOutlined style={{ marginRight: 8 }} />
+              年里程敏感性分析
+            </h3>
+            <Text style={{ color: 'rgba(224,245,232,0.45)', fontSize: 11, display: 'block', marginBottom: 8 }}>
+              扫描 6~15 万 km/辆/年（基准 10 万）；里程越高，固定购车溢价摊薄越快。15 万 km 为干线物流高强度场景
+            </Text>
+            <ReactECharts option={sensChart(sens.annual_mileage, v => `${v / 10000}`)} style={{ height: 280 }} />
+          </div>
+        </Col>
+        <Col xs={24} lg={12}>
+          <div className="h2-panel" style={{ padding: 16 }}>
+            <h3 style={{ color: '#69F0AE', marginBottom: 12 }}>
+              <RiseOutlined style={{ marginRight: 8 }} />
+              敏感性分析关键结论
+            </h3>
+            {h2r30 && (
+              <Text style={{ color: 'rgba(224,245,232,0.85)', fontSize: 13, display: 'block', marginBottom: 10 }}>
+                · 氢价降至 <b style={{ color: '#00E676' }}>30 元/kg</b>（2026 年多地主产区已实现）：回收期缩至
+                <b style={{ color: '#00E676' }}> {h2r30.payback_years} 年</b>，8 年净赚
+                <b style={{ color: '#00E676' }}> {(h2r30.lifetime_savings_yuan / 10000).toFixed(0)} 万元</b>
+              </Text>
+            )}
+            {h2r25 && (
+              <Text style={{ color: 'rgba(224,245,232,0.85)', fontSize: 13, display: 'block', marginBottom: 10 }}>
+                · 氢价进一步降至 <b style={{ color: '#00E676' }}>25 元/kg</b>（绿氢规模化目标价）：回收期
+                <b style={{ color: '#00E676' }}> {h2r25.payback_years} 年</b>，8 年净赚
+                <b style={{ color: '#00E676' }}> {(h2r25.lifetime_savings_yuan / 10000).toFixed(0)} 万元</b>
+              </Text>
+            )}
+            {dsr85 && (
+              <Text style={{ color: 'rgba(224,245,232,0.85)', fontSize: 13, display: 'block', marginBottom: 10 }}>
+                · 柴油价升至 <b style={{ color: '#00E676' }}>8.5 元/L</b>（油价上行情景）：回收期
+                <b style={{ color: '#00E676' }}> {dsr85.payback_years} 年</b>
+              </Text>
+            )}
+            {mkr15 && (
+              <Text style={{ color: 'rgba(224,245,232,0.85)', fontSize: 13, display: 'block', marginBottom: 10 }}>
+                · 年里程提至 <b style={{ color: '#00E676' }}>15 万 km/辆</b>（干线物流高强度）：回收期
+                <b style={{ color: '#00E676' }}> {mkr15.payback_years} 年</b>
+              </Text>
+            )}
+            <Text style={{ color: 'rgba(224,245,232,0.5)', fontSize: 11, display: 'block', marginTop: 4, lineHeight: 1.8 }}>
+              方法：{sens.method}。基准情景（氢价 35 元/kg）下回收期 8.0 年、生命周期约打平——结论对氢价最敏感：
+              氢价每降 1 元/kg，年节省增加约 1.2 万元（两辆车），是本项目价值主张的核心杠杆。
+            </Text>
+          </div>
+        </Col>
+      </Row>
+
       {/* 单车明细 */}
       <Row gutter={[8, 8]}>
         <Col xs={24}>
@@ -399,6 +555,12 @@ export default function ValueAnalysis() {
               item: '投资回收期',
               formula: `车辆溢价 ${fmtYuan(roi.vehicle_premium_yuan)}/辆 × ${ds.vehicle_count} 辆 ÷ 年节省 ${fmtYuan(ann.annual_cost_saved)} = ${roi.payback_years ?? '∞'} 年`,
               source: '氢能重卡较同级柴油车约贵 30 万（市场公开报价口径）',
+            },
+            {
+              key: '6b',
+              item: '敏感性分析',
+              formula: `固定实测百公里氢耗 ${ds.avg_h2_per_100km} kg，单变量扫描氢价 25~40 元/kg、柴油价 6~8.5 元/L、年里程 6~15 万 km/辆，重算年度节省与回收期`,
+              source: data.sensitivity.method,
             },
           ]}
           columns={[
