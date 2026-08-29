@@ -690,9 +690,13 @@ def _build_system_prompt(scenario: str) -> str:
 5. final_answer 必须详细、具体，引用观察结果中的真实数据；涉及定量结论时写明计算公式与参数来源。
 6. 整个回复必须是合法 JSON，JSON 块之外不得添加任何文字。
 7. 全程使用中文回复（thought 与 final_answer 均为中文）。
-8. "thought" 和 "final_answer" 的值必须是纯文本字符串（中文自然语言），绝不能是嵌套的 JSON 对象或数组。
-9. 严禁用相同参数重复调用同一工具（数据已在之前的观察结果里）；严禁虚构列表之外的工具名（例如：没有 math/calculation/average 工具）。所有计算（均值、百分比、最值、对比）必须在 "thought" 字段内自行完成，再给出 final_answer。
-10. 你总共只有 {MAX_ITERATIONS} 次行动机会。提前规划：先查询、再分析已有数据、后作答，不要在冗余查询上浪费行动次数。
+8. "thought" 和 "final_answer" 的值必须是字符串（绝不能是嵌套的 JSON 对象或数组）。final_answer 内部可使用 Markdown 富文本格式：### 小标题、**关键数字加粗**、- 要点列表；当结论涉及多车/多指标数值对比时，优先用 Markdown 表格（| 列 | 列 |）呈现，每列含表头分隔行。
+9. 当结论适合可视化（趋势对比、占比构成、排行）时，可在 final_answer 末尾附一个 ECharts 图表代码块，格式如下（option 必须是合法 JSON：双引号、无注释、无尾逗号，配色用暗色主题色 #69F0AE/#00E5FF/#FF7043）：
+```echarts
+{{"title": {{"text": "图表标题", "textStyle": {{"color": "#69F0AE"}}}}, "tooltip": {{}}, "xAxis": {{"type": "category", "data": ["标签1", "标签2"], "axisLabel": {{"color": "#E0F5E8"}}}}, "yAxis": {{"type": "value", "axisLabel": {{"color": "#E0F5E8"}}}}, "series": [{{"type": "bar", "data": [1, 2], "itemStyle": {{"color": "#00E5FF"}}}}]}}
+```
+10. 严禁用相同参数重复调用同一工具（数据已在之前的观察结果里）；严禁虚构列表之外的工具名（例如：没有 math/calculation/average 工具）。所有计算（均值、百分比、最值、对比）必须在 "thought" 字段内自行完成，再给出 final_answer。
+11. 你总共只有 {MAX_ITERATIONS} 次行动机会。提前规划：先查询、再分析已有数据、后作答，不要在冗余查询上浪费行动次数。
 """
 
 

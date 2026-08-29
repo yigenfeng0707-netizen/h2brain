@@ -1,7 +1,10 @@
 // 氢智行 H2Brain - 智能体详情页通用组件
-import { useEffect, useState, useRef } from 'react'
+import { useEffect, useState, useRef, isValidElement } from 'react'
 import { Spin, Empty, Tag, Row, Col, Input, Button, Card, Space, Typography, Tooltip } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, BulbOutlined, CheckCircleOutlined, PictureOutlined } from '@ant-design/icons'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import ReactECharts from 'echarts-for-react'
 import api, { apiGet, apiPost, agentExecuteStream } from '@/lib/request'
 
 const { Text, Paragraph } = Typography
@@ -29,23 +32,98 @@ interface ChatMessage {
 // 周报配图 URL 模式（后端工具/端点返回）
 const REPORT_IMG_RE = /\/api\/v1\/agents\/report-image\/([a-z0-9]+)/g
 
-// 消息内容渲染: 检测配图链接并内联展示图片
+// ── Markdown 富文本渲染 ──────────────────────────────────────────────
+// LLM 结论含 Markdown（标题/列表/表格/加粗）时渲染为富文本；
+// 含 ```echarts 代码块时自动调用 ECharts 渲染专业图表（失败兜底显示原文）。
+
+// ECharts 代码块渲染：解析 option JSON，非法时兜底为源码展示
+function EChartsBlock({ code }: { code: string }) {
+  const cleaned = code.trim().replace(/^```(?:echarts)?\s*\n?/, '').replace(/\n?```\s*$/, '')
+  try {
+    const option = JSON.parse(cleaned)
+    if (typeof option !== 'object' || option === null) throw new Error('not an option object')
+    return (
+      <div style={{ marginTop: 10, padding: 8, borderRadius: 8, background: 'rgba(4,20,14,0.85)', border: '1px solid rgba(0,229,255,0.25)' }}>
+        <ReactECharts option={option} notMerge={true} style={{ height: 280 }} />
+      </div>
+    )
+  } catch {
+    return (
+      <pre style={{ margin: '8px 0', padding: 10, borderRadius: 6, background: 'rgba(4,20,14,0.9)', border: '1px solid rgba(105,240,174,0.2)', color: 'rgba(224,245,232,0.7)', fontSize: 11, overflowX: 'auto', whiteSpace: 'pre-wrap' }}>
+        {cleaned}
+      </pre>
+    )
+  }
+}
+
+// Markdown 各元素暗色主题样式（表格/列表/标题/行内代码）
+const MD_TEXT = 'rgba(224,245,232,0.88)'
+const MD_TEXT_DIM = 'rgba(224,245,232,0.55)'
+
+const mdComponents = {
+  h1: (p: any) => <h3 style={{ color: '#69F0AE', fontSize: 16, margin: '14px 0 8px', fontWeight: 700 }} {...p} />,
+  h2: (p: any) => <h4 style={{ color: '#69F0AE', fontSize: 15, margin: '12px 0 6px', fontWeight: 700 }} {...p} />,
+  h3: (p: any) => <h5 style={{ color: '#69F0AE', fontSize: 14, margin: '10px 0 6px', fontWeight: 600 }} {...p} />,
+  p: (p: any) => <p style={{ margin: '6px 0', fontSize: 13, color: MD_TEXT, lineHeight: 1.75 }} {...p} />,
+  ul: (p: any) => <ul style={{ margin: '6px 0', paddingLeft: 20, fontSize: 13, lineHeight: 1.75, color: MD_TEXT }} {...p} />,
+  ol: (p: any) => <ol style={{ margin: '6px 0', paddingLeft: 22, fontSize: 13, lineHeight: 1.75, color: MD_TEXT }} {...p} />,
+  li: (p: any) => <li style={{ margin: '2px 0' }} {...p} />,
+  strong: (p: any) => <strong style={{ color: '#00E676' }} {...p} />,
+  blockquote: (p: any) => (
+    <blockquote style={{ margin: '8px 0', padding: '6px 12px', borderLeft: '3px solid rgba(105,240,174,0.5)', background: 'rgba(105,240,174,0.06)', color: MD_TEXT_DIM, fontSize: 12 }} {...p} />
+  ),
+  // 表格：暗色边框 + 滚动容器（宽表不撑破气泡）
+  table: (p: any) => (
+    <div style={{ overflowX: 'auto', margin: '10px 0' }}>
+      <table style={{ borderCollapse: 'collapse', width: '100%', fontSize: 12 }} {...p} />
+    </div>
+  ),
+  th: (p: any) => (
+    <th style={{ border: '1px solid rgba(105,240,174,0.35)', padding: '6px 10px', background: 'rgba(105,240,174,0.12)', color: '#69F0AE', textAlign: 'left', whiteSpace: 'nowrap' }} {...p} />
+  ),
+  td: (p: any) => (
+    <td style={{ border: '1px solid rgba(105,240,174,0.2)', padding: '5px 10px', color: MD_TEXT, whiteSpace: 'nowrap' }} {...p} />
+  ),
+  // 行内代码
+  code: ({ children, className, ...rest }: any) => (
+    <code style={{ background: 'rgba(0,229,255,0.1)', color: '#00E5FF', borderRadius: 4, padding: '1px 5px', fontSize: 12 }} className={className} {...rest}>
+      {children}
+    </code>
+  ),
+  // 块级代码：echarts 语言走专业渲染，其余暗色源码块
+  pre: ({ children, ...rest }: any) => {
+    const child = Array.isArray(children) ? children[0] : children
+    if (isValidElement<any>(child) && String(child.props?.className || '').includes('language-echarts')) {
+      return <EChartsBlock code={String(child.props?.children ?? '')} />
+    }
+    return (
+      <pre style={{ margin: '8px 0', padding: 10, borderRadius: 6, background: 'rgba(4,20,14,0.9)', border: '1px solid rgba(105,240,174,0.2)', color: 'rgba(224,245,232,0.7)', fontSize: 11, overflowX: 'auto' }} {...rest}>
+        {children}
+      </pre>
+    )
+  },
+}
+
+// 消息内容渲染: Markdown 富文本 + 配图内联 + echarts 专业图表
 function MessageBody({ content }: { content: string }) {
   const urls = content.match(REPORT_IMG_RE)
-  if (!urls) return <>{content}</>
-  const text = content
-    .replace(/配图链接：?\s*\/api\/v1\/agents\/report-image\/[a-z0-9]+/g, '')
-    .replace(/!\[[^\]]*\]\(\/api\/v1\/agents\/report-image\/[a-z0-9]+\)/g, '')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
+  const text = urls
+    ? content
+        .replace(/配图链接：?\s*\/api\/v1\/agents\/report-image\/[a-z0-9]+/g, '')
+        .replace(/!\[[^\]]*\]\(\/api\/v1\/agents\/report-image\/[a-z0-9]+\)/g, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim()
+    : content
   return (
     <>
       {text && (
-        <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
-          {text}
-        </Paragraph>
+        <div style={{ wordBreak: 'break-word' }}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]} components={mdComponents}>
+            {text}
+          </ReactMarkdown>
+        </div>
       )}
-      {urls.map((u, i) => (
+      {urls?.map((u, i) => (
         <div key={i} style={{ marginTop: 8 }}>
           <img
             src={u}
