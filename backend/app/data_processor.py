@@ -40,15 +40,23 @@ from .thresholds import THRESHOLDS
 # Configuration
 # ---------------------------------------------------------------------------
 
-DATA_DIR = (
-    Path(os.environ.get("H2BRAIN_DATA_DIR", ""))
-    if os.environ.get("H2BRAIN_DATA_DIR")
-    else (
-        Path(__file__).resolve().parent.parent.parent.parent
-        / "T05_数据包"
-        / "T05_氢能车辆运营智能分析与决策助手数据包"
-    )
+# 数据目录解析优先级: 环境变量(生产 Docker 用 /app/data) > 仓库内 backend/data
+# > 原始 T05 数据包(父目录, 可能已被归档移动)。缓存清理后若路径失效会导致
+# 0 车辆假数据, 故用回退链保证总能找到真实数据。
+_ENV_DATA_DIR = Path(os.environ.get("H2BRAIN_DATA_DIR", "")) if os.environ.get("H2BRAIN_DATA_DIR") else None
+_REPO_DATA_DIR = Path(__file__).resolve().parent.parent / "data"  # backend/data
+_T05_DATA_DIR = (
+    Path(__file__).resolve().parent.parent.parent.parent
+    / "T05_数据包"
+    / "T05_氢能车辆运营智能分析与决策助手数据包"
 )
+
+if _ENV_DATA_DIR is not None:
+    DATA_DIR = _ENV_DATA_DIR
+elif _REPO_DATA_DIR.is_dir() and (_REPO_DATA_DIR / "测试车辆1#车辆数据.parquet").exists():
+    DATA_DIR = _REPO_DATA_DIR
+else:
+    DATA_DIR = _T05_DATA_DIR
 CACHE_DIR = Path(__file__).resolve().parent.parent.parent / ".cache"
 CACHE_DIR.mkdir(exist_ok=True)
 
