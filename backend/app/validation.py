@@ -123,14 +123,13 @@ def _load_manual_records() -> list[dict[str, Any]]:
     return records
 
 
-# Mapping from manual work-condition categories to our road-condition types
-# Manual categories: 综合工况 (mixed urban), 国道工况 (highway/national road),
-#                    山区国道 (mountain road), 平原高速 (flat highway)
+# Mapping from manual (official) work-condition categories to our road-condition types
+# v2.1: 工程类别已对齐官方四分类 (怠速/场区-装卸 归入 综合工况), 直接映射
 CONDITION_MAP = {
-    "综合工况": ["城市-快速路", "城市-国道", "高速", "怠速", "场区-装卸"],
-    "国道工况": ["城市-国道", "高速"],
-    "山区国道": ["山区", "城市-国道"],
-    "平原高速": ["高速", "城市-快速路"],
+    "综合工况": ["综合工况", "怠速", "场区-装卸"],
+    "国道工况": ["国道工况"],
+    "山区国道": ["山区国道"],
+    "平原高速": ["平原高速"],
 }
 
 

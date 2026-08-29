@@ -282,12 +282,13 @@ function getContrastColor(hex: string): string {
   return luminance > 0.55 ? '#1a1a1a' : '#fff'
 }
 
-/** 6 类路况颜色兜底 (与后端 ROAD_COLORS 一致, 运行时以 road_bands/segments 实际颜色优先) */
+/** 6 类路况颜色兜底 (与后端 ROAD_COLORS 一致, 运行时以 road_bands/segments 实际颜色优先)
+ *  v2.1 工况体系对齐官方四分类: 平原高速/国道工况/山区国道/综合工况 */
 const ROAD_CLASS_COLORS: Record<string, string> = {
-  '高速': '#2196F3',
-  '城市-快速路': '#FF9800',
-  '城市-国道': '#4CAF50',
-  '山区': '#9C27B0',
+  '平原高速': '#2196F3',
+  '国道工况': '#4CAF50',
+  '山区国道': '#9C27B0',
+  '综合工况': '#FF9800',
   '怠速': '#F44336',
   '场区-装卸': '#E91E63',
 }

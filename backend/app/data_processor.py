@@ -888,7 +888,7 @@ def _detect_h2_anomalies(trip: pd.DataFrame, road_segments: list[dict]) -> list[
 
             # 4. Road type context
             road_type = seg.get("road_type", "")
-            if road_type == "山区":
+            if road_type == "山区国道":
                 reasons.append(
                     {
                         "factor": "山区爬坡",

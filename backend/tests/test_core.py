@@ -206,7 +206,7 @@ class TestWorkingCondition:
         """Road segments should be classified into known types."""
         segments = sample_trip_detail.get("road_segments", [])
         assert len(segments) > 0, "No road segments classified"
-        valid_types = {"高速", "城市-快速路", "城市-国道", "山区", "怠速", "场区-装卸"}
+        valid_types = {"平原高速", "国道工况", "山区国道", "综合工况", "怠速", "场区-装卸"}
         for seg in segments:
             assert seg["road_type"] in valid_types, (
                 f"Unknown road type: {seg['road_type']}"
