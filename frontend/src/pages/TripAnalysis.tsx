@@ -1,8 +1,8 @@
 // 氢智行 H2Brain - 精细化行程分析 Dashboard
 // 基于真实氢能车辆遥测数据，对标参考设计图
 import { useState, useEffect, useMemo, useRef } from 'react'
-import { Card, Select, Row, Col, Table, Spin, Empty, Tag, Statistic, Button, Modal, Upload, message, Tooltip, Progress } from 'antd'
-import { UploadOutlined, FileTextOutlined, ThunderboltOutlined, WarningOutlined, BarChartOutlined, ExperimentOutlined } from '@ant-design/icons'
+import { Card, Select, Row, Col, Table, Spin, Empty, Tag, Statistic, Button, Modal, Upload, message, Tooltip, Progress, Collapse } from 'antd'
+import { UploadOutlined, FileTextOutlined, ThunderboltOutlined, WarningOutlined, BarChartOutlined, ExperimentOutlined, InfoCircleOutlined } from '@ant-design/icons'
 import type { UploadProps } from 'antd'
 import ReactECharts from 'echarts-for-react'
 import { apiGet, apiPost } from '@/lib/request'
@@ -33,6 +33,18 @@ interface TripSummary {
   weather_summary?: string
 }
 
+/** 多维证据矩阵 - 单特征证据项 */
+interface EvidenceItem {
+  feature: string
+  feature_label: string
+  unit: string
+  value: number
+  expected_low: number
+  expected_high: number
+  expected: string
+  match_ratio: number
+}
+
 interface RoadSegment {
   road_type: string
   color: string
@@ -45,6 +57,17 @@ interface RoadSegment {
   h2_per_100km: number
   stack_power_kw: number
   load_changes: number
+  // ---- v2 多维证据矩阵新增 ----
+  /** 置信度 0-1 */
+  confidence?: number
+  /** 人类可读判定依据 */
+  verdict?: string
+  /** 6 类路况得分对比 */
+  class_scores?: Record<string, number>
+  /** 7 维特征逐项证据 */
+  evidence?: EvidenceItem[]
+  start_iso?: string
+  end_iso?: string
 }
 
 interface PowerMode {
@@ -81,6 +104,9 @@ interface TimeSeries {
   high_pressure: number[]
   stack_temp_in: number[]
   h2_consumed_cum: number[]
+  // ---- v2 新增 GPS 轨迹 (null = GPS 无效) ----
+  gps_lon?: (number | null)[]
+  gps_lat?: (number | null)[]
 }
 
 interface RoadBand {
@@ -88,6 +114,25 @@ interface RoadBand {
   end_min: number
   road_type: string
   color: string
+  /** v2 新增: 置信度 0-1 */
+  confidence?: number
+}
+
+/** 多维证据矩阵 - 方法论说明 */
+interface MethodologyFeature {
+  key: string
+  label: string
+  unit: string
+}
+
+interface RoadMethodology {
+  name: string
+  version: string
+  window: string
+  features: MethodologyFeature[]
+  classes: string[]
+  rationale: string
+  vs_old: string
 }
 
 interface ModeBand {
@@ -191,6 +236,8 @@ interface TripDetail {
   driving_behaviors: DrivingBehavior[]
   factor_analysis: FactorAnalysis
   weather?: WeatherInfo | null
+  /** v2 多维证据矩阵路况识别方法论 */
+  road_methodology?: RoadMethodology
 }
 
 interface Vehicle {
@@ -233,6 +280,30 @@ function getContrastColor(hex: string): string {
   // 相对亮度 (WCAG 简化版)
   const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
   return luminance > 0.55 ? '#1a1a1a' : '#fff'
+}
+
+/** 6 类路况颜色兜底 (与后端 ROAD_COLORS 一致, 运行时以 road_bands/segments 实际颜色优先) */
+const ROAD_CLASS_COLORS: Record<string, string> = {
+  '高速': '#2196F3',
+  '城市-快速路': '#FF9800',
+  '城市-国道': '#4CAF50',
+  '山区': '#9C27B0',
+  '怠速': '#F44336',
+  '场区-装卸': '#E91E63',
+}
+
+/** 匹配率 → 颜色 (高=绿, 中=黄, 低=红) */
+function matchRatioColor(ratio: number): string {
+  if (ratio >= 0.8) return '#69F0AE'
+  if (ratio >= 0.5) return '#FFB347'
+  return '#FF6B6B'
+}
+
+/** 置信度 → 颜色 */
+function confidenceColor(c: number): string {
+  if (c >= 0.95) return '#69F0AE'
+  if (c >= 0.85) return '#FFB347'
+  return '#FF6B6B'
 }
 
 // ---- Chart Background Bands ----
@@ -417,6 +488,375 @@ function BattCurChart({ ts, roadBands }: { ts: TimeSeries; roadBands: RoadBand[]
   return <ReactECharts option={option} style={{ height: 220 }} />
 }
 
+// ---- Evidence Row (单特征证据条) ----
+function EvidenceRow({ ev }: { ev: EvidenceItem }) {
+  const ratio = Math.max(0, Math.min(1, ev.match_ratio ?? 0))
+  const color = matchRatioColor(ratio)
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6, fontSize: 12 }}>
+      <span style={{ width: 100, flexShrink: 0, color: 'rgba(224,245,232,0.85)' }}>
+        {ev.feature_label}
+      </span>
+      <span style={{ width: 92, flexShrink: 0, textAlign: 'right', color: '#E0F5E8', fontWeight: 600 }}>
+        {fmtNum(ev.value, 2)}
+        {ev.unit ? ` ${ev.unit}` : ''}
+      </span>
+      <span style={{ width: 132, flexShrink: 0, fontSize: 11, color: 'rgba(224,245,232,0.45)' }}>
+        期望 {ev.expected}
+      </span>
+      <div style={{ flex: 1, minWidth: 60, height: 6, background: 'rgba(255,255,255,0.06)', borderRadius: 3 }}>
+        <div style={{ width: `${ratio * 100}%`, height: '100%', background: color, borderRadius: 3 }} />
+      </div>
+      <span style={{ width: 38, flexShrink: 0, textAlign: 'right', color, fontWeight: 600 }}>
+        {(ratio * 100).toFixed(0)}%
+      </span>
+    </div>
+  )
+}
+
+// ---- Class Scores Chart (6 类得分对比横向条形图) ----
+function ClassScoresChart({ scores, winner }: { scores: Record<string, number>; winner: string }) {
+  const entries = Object.entries(scores).sort((a, b) => b[1] - a[1])
+  if (entries.length === 0) return null
+  const option = {
+    grid: { left: 88, right: 46, top: 4, bottom: 4 },
+    xAxis: { type: 'value', min: 0, max: 1, show: false },
+    yAxis: {
+      type: 'category',
+      data: entries.map((e) => e[0]),
+      axisTick: { show: false },
+      axisLine: { show: false },
+      axisLabel: { color: 'rgba(224,245,232,0.8)', fontSize: 11 },
+    },
+    series: [
+      {
+        type: 'bar',
+        barWidth: 10,
+        data: entries.map(([k, v]) => ({
+          value: v,
+          itemStyle: {
+            color: k === winner ? '#69F0AE' : 'rgba(105,240,174,0.25)',
+            borderRadius: 2,
+          },
+        })),
+        label: {
+          show: true,
+          position: 'right',
+          fontSize: 10,
+          color: 'rgba(224,245,232,0.6)',
+          formatter: (p: any) => Number(p.value).toFixed(3),
+        },
+      },
+    ],
+    tooltip: {
+      trigger: 'item',
+      formatter: (p: any) => `${p.name}: ${Number(p.value).toFixed(3)}`,
+    },
+  }
+  return <ReactECharts option={option} style={{ height: entries.length * 26 + 8 }} />
+}
+
+// ---- Road Evidence Panel (展开行: 判定依据 + 7 维证据 + 6 类得分) ----
+function RoadEvidencePanel({ seg }: { seg: RoadSegment }) {
+  return (
+    <div style={{ padding: '4px 4px 8px' }}>
+      {seg.verdict && (
+        <div
+          style={{
+            marginBottom: 10,
+            padding: '8px 12px',
+            fontSize: 12,
+            lineHeight: 1.8,
+            color: 'rgba(224,245,232,0.82)',
+            background: 'rgba(105,240,174,0.06)',
+            border: '1px solid rgba(105,240,174,0.15)',
+            borderRadius: 6,
+          }}
+        >
+          <span style={{ color: '#69F0AE', fontWeight: 700 }}>判定依据: </span>
+          {seg.verdict}
+        </div>
+      )}
+      <Row gutter={[16, 8]}>
+        <Col xs={24} md={13}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#69F0AE', marginBottom: 6 }}>
+            特征证据矩阵 · {seg.evidence?.length ?? 0} 维逐项匹配
+          </div>
+          {seg.evidence?.map((ev) => (
+            <EvidenceRow key={ev.feature} ev={ev} />
+          ))}
+        </Col>
+        <Col xs={24} md={11}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#69F0AE', marginBottom: 6 }}>
+            6 类路况得分对比 · 判定「{seg.road_type}」
+          </div>
+          <ClassScoresChart scores={seg.class_scores ?? {}} winner={seg.road_type} />
+        </Col>
+      </Row>
+    </div>
+  )
+}
+
+// ---- Methodology Card (可折叠方法论说明) ----
+function MethodologyCard({
+  methodology,
+  roadBands,
+}: {
+  methodology: RoadMethodology
+  roadBands: RoadBand[]
+}) {
+  const colorMap = useMemo(() => {
+    const m: Record<string, string> = { ...ROAD_CLASS_COLORS }
+    for (const b of roadBands) m[b.road_type] = b.color
+    return m
+  }, [roadBands])
+
+  return (
+    <Collapse
+      size="small"
+      style={{ marginBottom: 8 }}
+      items={[
+        {
+          key: 'm',
+          label: (
+            <span style={{ fontSize: 13 }}>
+              <InfoCircleOutlined style={{ color: '#69F0AE', marginRight: 6 }} />
+              <span style={{ color: '#69F0AE', fontWeight: 700 }}>
+                方法论 · {methodology.name} v{methodology.version}
+              </span>
+              <span style={{ color: 'rgba(224,245,232,0.45)', marginLeft: 10, fontSize: 12 }}>
+                完全可解释的多维证据矩阵 · 点击展开详情
+              </span>
+            </span>
+          ),
+          children: (
+            <div style={{ fontSize: 12, color: 'rgba(224,245,232,0.75)', lineHeight: 1.9 }}>
+              <div style={{ marginBottom: 4 }}>
+                <span style={{ color: '#69F0AE', fontWeight: 600 }}>窗口与平滑: </span>
+                {methodology.window}
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <span style={{ color: '#69F0AE', fontWeight: 600 }}>
+                  识别类别 ({methodology.classes.length} 类):{' '}
+                </span>
+                {methodology.classes.map((c) => {
+                  const color = colorMap[c] ?? '#888888'
+                  return (
+                    <Tag
+                      key={c}
+                      style={{
+                        fontSize: 11,
+                        background: `${color}20`,
+                        borderColor: `${color}50`,
+                        color,
+                      }}
+                    >
+                      {c}
+                    </Tag>
+                  )
+                })}
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <span style={{ color: '#69F0AE', fontWeight: 600 }}>
+                  特征 ({methodology.features.length} 维):{' '}
+                </span>
+                {methodology.features.map((f) => (
+                  <Tag
+                    key={f.key}
+                    style={{
+                      fontSize: 11,
+                      background: 'rgba(105,240,174,0.08)',
+                      borderColor: 'rgba(105,240,174,0.25)',
+                      color: 'rgba(224,245,232,0.85)',
+                    }}
+                  >
+                    {f.label}
+                    {f.unit ? ` (${f.unit})` : ''}
+                  </Tag>
+                ))}
+              </div>
+              <div style={{ marginBottom: 4 }}>
+                <span style={{ color: '#69F0AE', fontWeight: 600 }}>原理: </span>
+                {methodology.rationale}
+              </div>
+              <div>
+                <span style={{ color: '#FFB347', fontWeight: 600 }}>vs 旧版: </span>
+                {methodology.vs_old}
+              </div>
+            </div>
+          ),
+        },
+      ]}
+    />
+  )
+}
+
+// ---- GPS Trajectory Map (按路况着色, 经纬度散点+连线, 无需地图底图) ----
+function GpsMap({ ts, roadBands }: { ts: TimeSeries; roadBands: RoadBand[] }) {
+  const H = 400
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [wrapW, setWrapW] = useState(0)
+
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const update = () => setWrapW(el.clientWidth)
+    update()
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
+  const { hasGps, option } = useMemo(() => {
+    const lons = ts.gps_lon ?? []
+    const lats = ts.gps_lat ?? []
+    const times = ts.timestamps ?? []
+    const pts: { t: number; lon: number; lat: number }[] = []
+    for (let i = 0; i < Math.min(lons.length, lats.length); i++) {
+      const lo = lons[i]
+      const la = lats[i]
+      if (lo == null || la == null) continue
+      pts.push({ t: times[i] ?? 0, lon: lo, lat: la })
+    }
+    if (pts.length < 2) return { hasGps: false, option: null }
+
+    // 按 road_band 时间区间分组 → 每个区间一条 polyline, 同类合并为一个 series (图例去重)
+    const byType = new Map<
+      string,
+      { color: string; polylines: { coords: [number, number][]; label: string }[] }
+    >()
+    for (const b of roadBands) {
+      const coords: [number, number][] = []
+      for (const p of pts) {
+        if (p.t >= b.start_min && p.t <= b.end_min) coords.push([p.lon, p.lat])
+      }
+      if (coords.length < 2) continue
+      const entry = byType.get(b.road_type) ?? { color: b.color, polylines: [] }
+      entry.polylines.push({
+        coords,
+        label: `${fmtNum(b.start_min, 0)}~${fmtNum(b.end_min, 0)} min`,
+      })
+      byType.set(b.road_type, entry)
+    }
+
+    // 经纬度包围盒 + 3% 边距
+    let minLon = Infinity
+    let maxLon = -Infinity
+    let minLat = Infinity
+    let maxLat = -Infinity
+    for (const p of pts) {
+      if (p.lon < minLon) minLon = p.lon
+      if (p.lon > maxLon) maxLon = p.lon
+      if (p.lat < minLat) minLat = p.lat
+      if (p.lat > maxLat) maxLat = p.lat
+    }
+    const padLon = Math.max((maxLon - minLon) * 0.03, 1e-4)
+    const padLat = Math.max((maxLat - minLat) * 0.03, 1e-4)
+    const lon0 = minLon - padLon
+    const lon1 = maxLon + padLon
+    const lat0 = minLat - padLat
+    const lat1 = maxLat + padLat
+
+    // 等比网格: 按当地经纬度实际距离换算, 保证轨迹不变形
+    const latMid = (minLat + maxLat) / 2
+    const kmPerLon = 111.32 * Math.cos((latMid * Math.PI) / 180)
+    const kmPerLat = 110.57
+    const trackW = (lon1 - lon0) * kmPerLon
+    const trackH = (lat1 - lat0) * kmPerLat
+    const chartW = wrapW > 60 ? wrapW : 700
+    const availW = chartW - 16
+    const availH = H - 44 - 10 // 顶部图例区 + 底部余量
+    const scale = Math.min(availW / trackW, availH / trackH)
+    const gridW = Math.max(Math.min(availW, trackW * scale), 10)
+    const gridH = Math.max(Math.min(availH, trackH * scale), 10)
+    const gridLeft = (chartW - gridW) / 2
+    const gridTop = 40 + (availH - gridH) / 2
+
+    const series: object[] = []
+    for (const [type, entry] of byType) {
+      series.push({
+        name: type,
+        type: 'lines',
+        coordinateSystem: 'cartesian2d',
+        polyline: true,
+        lineStyle: { color: entry.color, width: 3, opacity: 0.9 },
+        emphasis: { lineStyle: { width: 5 } },
+        data: entry.polylines.map((pl) => ({ coords: pl.coords, label: pl.label })),
+      })
+    }
+    const first = pts[0]
+    const last = pts[pts.length - 1]
+    series.push({
+      name: '起点',
+      type: 'scatter',
+      z: 10,
+      data: [{ value: [first.lon, first.lat] }],
+      symbolSize: 12,
+      itemStyle: { color: '#FF5252', borderColor: 'rgba(255,255,255,0.9)', borderWidth: 1.5 },
+    })
+    series.push({
+      name: '终点',
+      type: 'scatter',
+      z: 10,
+      data: [{ value: [last.lon, last.lat] }],
+      symbolSize: 12,
+      itemStyle: { color: '#69F0AE', borderColor: 'rgba(255,255,255,0.9)', borderWidth: 1.5 },
+    })
+
+    const opt = {
+      tooltip: {
+        trigger: 'item',
+        formatter: (p: any) => {
+          const extra = p?.data?.label ? `<br/>时段: ${p.data.label}` : ''
+          const coord =
+            p?.data?.value != null
+              ? `<br/>${p.data.value[0].toFixed(4)}°E, ${p.data.value[1].toFixed(4)}°N`
+              : ''
+          return `<b>${p.seriesName}</b>${extra}${coord}`
+        },
+      },
+      legend: {
+        top: 2,
+        left: 'center',
+        itemWidth: 14,
+        itemHeight: 8,
+        textStyle: { color: 'rgba(224,245,232,0.75)', fontSize: 11 },
+        data: [...byType.keys(), '起点', '终点'],
+      },
+      grid: { left: gridLeft, top: gridTop, width: gridW, height: gridH },
+      xAxis: {
+        type: 'value',
+        min: lon0,
+        max: lon1,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        axisLine: { show: false },
+        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.05)' } },
+      },
+      yAxis: {
+        type: 'value',
+        min: lat0,
+        max: lat1,
+        axisLabel: { show: false },
+        axisTick: { show: false },
+        axisLine: { show: false },
+        splitLine: { show: true, lineStyle: { color: 'rgba(255,255,255,0.05)' } },
+      },
+      series,
+    }
+    return { hasGps: true, option: opt }
+  }, [ts, roadBands, wrapW])
+
+  if (!hasGps || !option) {
+    return <Empty description="该行程无 GPS 数据" style={{ padding: '80px 0' }} />
+  }
+  return (
+    <div ref={wrapRef} style={{ width: '100%' }}>
+      <ReactECharts option={option} style={{ height: H }} notMerge />
+    </div>
+  )
+}
+
 // ---- Road Condition Table ----
 function RoadTable({ segments }: { segments: RoadSegment[] }) {
   const columns = [
@@ -449,6 +889,31 @@ function RoadTable({ segments }: { segments: RoadSegment[] }) {
     },
     { title: '电堆 kW', dataIndex: 'stack_power_kw', render: (v: number) => fmtNum(v) },
     { title: '变载', dataIndex: 'load_changes' },
+    {
+      title: '置信度',
+      dataIndex: 'confidence',
+      width: 118,
+      render: (_: any, r: RoadSegment) => {
+        if (r.road_type === '合计' || r.confidence == null) {
+          return <span style={{ color: 'rgba(224,245,232,0.35)' }}>—</span>
+        }
+        const color = confidenceColor(r.confidence)
+        return (
+          <Tooltip title={`判定「${r.road_type}」综合置信度 ${(r.confidence * 100).toFixed(1)}% · 展开行查看证据链`}>
+            <Progress
+              percent={r.confidence * 100}
+              size="small"
+              strokeColor={color}
+              format={(p) => (
+                <span style={{ color, fontSize: 11 }}>
+                  {((p === undefined ? 0 : p) / 100).toFixed(3)}
+                </span>
+              )}
+            />
+          </Tooltip>
+        )
+      },
+    },
   ]
 
   const totalRow: RoadSegment = {
@@ -475,6 +940,12 @@ function RoadTable({ segments }: { segments: RoadSegment[] }) {
       pagination={false}
       size="small"
       rowClassName={(_, i) => (i === data.length - 1 ? 'trip-total-row' : '')}
+      expandable={{
+        expandedRowRender: (r: RoadSegment) => <RoadEvidencePanel seg={r} />,
+        rowExpandable: (r: RoadSegment) =>
+          r.road_type !== '合计' &&
+          !!(r.verdict || r.evidence?.length || r.class_scores),
+      }}
     />
   )
 }
@@ -501,7 +972,9 @@ function ColorBar({ bands }: { bands: RoadBand[] }) {
               overflow: 'hidden',
               whiteSpace: 'nowrap',
             }}
-            title={`${b.road_type} (${fmtNum(b.start_min, 0)}~${fmtNum(b.end_min, 0)}min)`}
+            title={`${b.road_type} (${fmtNum(b.start_min, 0)}~${fmtNum(b.end_min, 0)}min)${
+              b.confidence != null ? ` · 置信度 ${(b.confidence * 100).toFixed(1)}%` : ''
+            }`}
           >
             {width > 5 ? b.road_type : ''}
           </div>
@@ -789,13 +1262,32 @@ export default function TripAnalysis() {
               size="small"
               title={
                 <span style={{ color: '#69F0AE' }}>
-                  路况标签 · 工况引擎自动识别
+                  路况标签 · 工况引擎自动识别（多维证据矩阵 v2 · 点击行展开证据链）
                 </span>
               }
               style={{ marginBottom: 12, background: 'rgba(10,46,31,0.4)' }}
             >
+              {tripDetail.road_methodology && (
+                <MethodologyCard
+                  methodology={tripDetail.road_methodology}
+                  roadBands={tripDetail.road_bands}
+                />
+              )}
               <RoadTable segments={tripDetail.road_segments} />
               <ColorBar bands={tripDetail.road_bands} />
+            </Card>
+
+            {/* GPS Trajectory Map */}
+            <Card
+              size="small"
+              title={
+                <span style={{ color: '#69F0AE' }}>
+                  🛰 GPS 行程轨迹 · 按路况着色
+                </span>
+              }
+              style={{ marginBottom: 12, background: 'rgba(10,46,31,0.4)' }}
+            >
+              <GpsMap ts={tripDetail.time_series} roadBands={tripDetail.road_bands} />
             </Card>
 
             {/* 4 Charts */}

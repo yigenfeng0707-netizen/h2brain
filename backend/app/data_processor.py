@@ -33,6 +33,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .road_classifier import classify_road_conditions_v2, explain_methodology
 from .thresholds import THRESHOLDS
 
 # ---------------------------------------------------------------------------
@@ -693,6 +694,13 @@ def _downsample_timeseries(trip: pd.DataFrame, target_points: int = 800) -> dict
         "high_pressure": [round(v, 1) for v in sampled["high_pressure"]],
         "stack_temp_in": [round(v, 1) for v in sampled["stack_temp_in"]],
         "h2_consumed_cum": [round(v, 2) for v in sampled["h2_consumed_cum"]],
+        # GPS 轨迹 (供地图按路况着色; 无效点为 null)
+        "gps_lon": [
+            None if pd.isna(v) else round(float(v), 5) for v in sampled["gps_lon"]
+        ],
+        "gps_lat": [
+            None if pd.isna(v) else round(float(v), 5) for v in sampled["gps_lat"]
+        ],
     }
 
 
@@ -1431,9 +1439,9 @@ class DataProcessor:
 
         trip = trips[trip_id]
         overview = _compute_trip_overview(trip, trip_id, vehicle_id)
-        road_segments = _classify_road_conditions(trip)
-        road_segments = _merge_adjacent_same_type(road_segments)
-        road_segments = _merge_short_segments(road_segments, trip)
+        # 多维证据矩阵路况识别 v2 (替代旧版速度均值+波动率双指标法)
+        road_segments = classify_road_conditions_v2(trip)
+        road_methodology = explain_methodology()
         power_modes = _detect_power_modes(trip)
         power_modes = _merge_adjacent_same_mode(power_modes)
         load_changes = _detect_load_changes(trip)
@@ -1443,13 +1451,9 @@ class DataProcessor:
         road_bands = []
         ts_start = trip["timestamp"].iloc[0]
         for seg in road_segments:
-            # Parse start/end times back to relative minutes
-            start_dt = datetime.strptime(
-                f"{overview['date']} {seg['start_time']}", "%Y-%m-%d %H:%M"
-            )
-            end_dt = datetime.strptime(
-                f"{overview['date']} {seg['end_time']}", "%Y-%m-%d %H:%M"
-            )
+            # v2 段自带 ISO 起止时间 (支持跨午夜行程)
+            start_dt = pd.Timestamp(seg["start_iso"])
+            end_dt = pd.Timestamp(seg["end_iso"])
             start_min = (start_dt - ts_start).total_seconds() / 60
             end_min = (end_dt - ts_start).total_seconds() / 60
             road_bands.append(
@@ -1458,6 +1462,7 @@ class DataProcessor:
                     "end_min": round(end_min, 1),
                     "road_type": seg["road_type"],
                     "color": seg["color"],
+                    "confidence": seg.get("confidence", 1.0),
                 }
             )
 
@@ -1502,6 +1507,7 @@ class DataProcessor:
         detail = {
             "overview": overview,
             "road_segments": road_segments,
+            "road_methodology": road_methodology,
             "power_modes": power_modes,
             "load_changes": load_changes,
             "load_change_count": len(load_changes),
