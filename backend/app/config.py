@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     llm_fallback_base_url: str = ""
     llm_fallback_model: str = ""
 
+    # 图像生成 - 运营周报配图（商汤 SenseNova，OpenAI 兼容接口）
+    image_api_key: str = ""
+    image_base_url: str = "https://token.sensenova.cn/v1"
+    image_model: str = "sensenova-u1.5-lite"
+
     # 发布标识
     release_id: str = "development"
 
@@ -56,6 +61,11 @@ class Settings(BaseSettings):
     def llm_fallback_enabled(self) -> bool:
         """是否启用了 fallback LLM。"""
         return bool(self.llm_fallback_api_key and self.llm_fallback_api_key.strip())
+
+    @property
+    def image_enabled(self) -> bool:
+        """是否启用了图像生成（周报配图）。"""
+        return bool(self.image_api_key and self.image_api_key.strip())
 
 
 @lru_cache

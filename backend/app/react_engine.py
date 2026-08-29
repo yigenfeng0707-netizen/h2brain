@@ -93,6 +93,11 @@ TOOL_DESCRIPTIONS = [
         "params": "vehicle_plate (str): 车牌号; dest_lng (float): 目标经度; dest_lat (float): 目标纬度",
     },
     {
+        "name": "generate_report_image",
+        "desc": "为运营周报生成一张配图：基于车队真实 KPI（里程/氢耗/成本节省/碳减排）自动构建提示词并调用商汤图像模型出图，返回配图链接与提示词说明。",
+        "params": "theme (str, 可选): 配图主题侧重，如 '碳减排'、'安全运营'；不传则为运营周报总览",
+    },
+    {
         "name": "schedule_station_dispatch",
         "desc": "为车辆推荐最优加氢站（调度沙盘推演）：基于距离、排队长度（M/M/c Erlang C 等待时间预测）、储氢量与氢价综合评分，返回排序站点列表。",
         "params": "vehicle_plate (str): 车牌号",
@@ -551,6 +556,32 @@ def _tool_optimize_fleet(params: dict) -> str:
         return f"车队优化暂不可用：{e}"
 
 
+# ---------------------------------------------------------------------------
+# 周报配图生成（商汤图像模型 + 真实 KPI 提示词）
+# ---------------------------------------------------------------------------
+
+
+def _tool_generate_report_image(params: dict) -> str:
+    theme = str(params.get("theme") or "").strip()
+    try:
+        from .report_image import generate_report_image
+
+        info = generate_report_image(theme)
+        return (
+            "运营周报配图已生成。\n"
+            f"主题：{info['theme']}\n"
+            f"配图链接：{info['image_url']}\n"
+            f"提示词（可解释依据）：{info['prompt']}\n"
+            f"配图对应的真实 KPI：{info['kpi_summary']}\n"
+            "请在最终结论中附上配图链接，供用户查看。"
+        )
+    except RuntimeError as e:
+        return f"配图暂不可用：{e}"
+    except Exception as e:  # noqa: BLE001
+        logger.warning("generate_report_image failed: %s", e)
+        return f"配图生成失败：{e}"
+
+
 # Tool registry
 TOOLS: dict[str, Callable[..., str]] = {
     "query_vehicle": _tool_query_vehicle,
@@ -565,6 +596,7 @@ TOOLS: dict[str, Callable[..., str]] = {
     "compute_cost": _tool_compute_cost,
     "analyze_fuelcell_health": _tool_analyze_fuelcell_health,
     "plan_route": _tool_plan_route,
+    "generate_report_image": _tool_generate_report_image,
     "schedule_station_dispatch": _tool_schedule_station_dispatch,
     "optimize_fleet": _tool_optimize_fleet,
 }

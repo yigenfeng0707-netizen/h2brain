@@ -1,7 +1,7 @@
 // 氢智行 H2Brain - 智能体详情页通用组件
 import { useEffect, useState, useRef } from 'react'
 import { Spin, Empty, Tag, Row, Col, Input, Button, Card, Space, Typography, Tooltip } from 'antd'
-import { SendOutlined, RobotOutlined, UserOutlined, BulbOutlined, CheckCircleOutlined } from '@ant-design/icons'
+import { SendOutlined, RobotOutlined, UserOutlined, BulbOutlined, CheckCircleOutlined, PictureOutlined } from '@ant-design/icons'
 import { apiGet, apiPost, agentExecuteStream } from '@/lib/request'
 
 const { Text, Paragraph } = Typography
@@ -26,6 +26,42 @@ interface ChatMessage {
   key?: string
 }
 
+// 周报配图 URL 模式（后端工具/端点返回）
+const REPORT_IMG_RE = /\/api\/v1\/agents\/report-image\/([a-z0-9]+)/g
+
+// 消息内容渲染: 检测配图链接并内联展示图片
+function MessageBody({ content }: { content: string }) {
+  const urls = content.match(REPORT_IMG_RE)
+  if (!urls) return <>{content}</>
+  const text = content
+    .replace(/配图链接：?\s*\/api\/v1\/agents\/report-image\/[a-z0-9]+/g, '')
+    .replace(/!\[[^\]]*\]\(\/api\/v1\/agents\/report-image\/[a-z0-9]+\)/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
+  return (
+    <>
+      {text && (
+        <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', fontSize: 13 }}>
+          {text}
+        </Paragraph>
+      )}
+      {urls.map((u, i) => (
+        <div key={i} style={{ marginTop: 8 }}>
+          <img
+            src={u}
+            alt="运营周报配图"
+            style={{
+              width: '100%', maxWidth: 480, borderRadius: 8,
+              border: '1px solid rgba(105,240,174,0.3)',
+              display: 'block',
+            }}
+          />
+        </div>
+      ))}
+    </>
+  )
+}
+
 // Preset questions per agent type
 const PRESET_QUESTIONS: Record<string, string[]> = {
   hydrogen_opt: [
@@ -47,6 +83,7 @@ const PRESET_QUESTIONS: Record<string, string[]> = {
     '车队利用率是多少？',
     '有哪些空驶行程？如何优化？',
     '推荐司机的最佳换班方案。',
+    '生成一张运营周报配图。',
   ],
   cost_analysis: [
     '单车全成本TCO是多少？',
@@ -66,6 +103,7 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [input, setInput] = useState('')
   const [asking, setAsking] = useState(false)
+  const [imgLoading, setImgLoading] = useState(false)
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -85,6 +123,41 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
   if (!agent) return <Empty />
 
   const presets = PRESET_QUESTIONS[agentKey] || []
+
+  // 一键生成运营周报配图（商汤图像模型 + 真实 KPI 提示词）
+  const generateReportImage = async () => {
+    if (imgLoading) return
+    const ts = () => new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+    const msgId = `img-${Date.now()}`
+    setMessages(prev => [...prev, {
+      role: 'agent',
+      content: '正在生成运营周报配图…（商汤图像模型，基于真实 KPI 构建提示词，约 10-60 秒）',
+      timestamp: ts(), thinking: true, key: msgId,
+    }])
+    setImgLoading(true)
+    try {
+      const res = await apiPost.reportImage({})
+      const d = res.data || {}
+      const body = [
+        `运营周报配图已生成（主题：${d.theme || '运营周报总览'}）`,
+        '',
+        `📊 真实 KPI：${d.kpi_summary || ''}`,
+        `🎨 提示词：${d.prompt || ''}`,
+        '',
+        `![运营周报配图](${d.image_url})`,
+      ].join('\n')
+      setMessages(prev => prev.map(m => (m as any).key === msgId
+        ? { ...m, content: body, thinking: false, timestamp: ts() }
+        : m))
+    } catch (e: any) {
+      const msg = e?.response?.data?.detail || e?.message || '未知错误'
+      setMessages(prev => prev.map(m => (m as any).key === msgId
+        ? { ...m, content: `配图生成失败：${msg}`, thinking: false, timestamp: ts() }
+        : m))
+    } finally {
+      setImgLoading(false)
+    }
+  }
 
   const askAgent = async (question: string) => {
     if (!question.trim() || asking) return
@@ -207,9 +280,24 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
         {/* 交互问答面板 */}
         <Col xs={24} lg={16}>
           <div className="h2-panel" style={{ padding: 16, height: '100%', display: 'flex', flexDirection: 'column' }}>
-            <h3 style={{ color: '#00E5FF', marginBottom: 12 }}>
-              <RobotOutlined style={{ marginRight: 8 }} />
-              智能体对话
+            <h3 style={{ color: '#00E5FF', marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span>
+                <RobotOutlined style={{ marginRight: 8 }} />
+                智能体对话
+              </span>
+              <Tooltip title="基于车队真实 KPI 自动构建提示词，调用商汤图像模型生成周报封面配图">
+                <Button
+                  size="small"
+                  ghost
+                  icon={<PictureOutlined />}
+                  loading={imgLoading}
+                  disabled={asking}
+                  onClick={generateReportImage}
+                  style={{ borderColor: 'rgba(105,240,174,0.4)', color: '#69F0AE' }}
+                >
+                  生成周报配图
+                </Button>
+              </Tooltip>
             </h3>
 
             {/* 预设问题 */}
@@ -274,15 +362,22 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
                       : 'rgba(0,200,83,0.08)',
                     border: `1px solid ${msg.role === 'user' ? 'rgba(0,229,255,0.2)' : 'rgba(105,240,174,0.2)'}`,
                   }}>
-                    <Paragraph style={{
-                      margin: 0,
-                      color: msg.thinking ? 'rgba(224,245,232,0.45)' : 'rgba(224,245,232,0.9)',
-                      fontSize: 13,
-                      whiteSpace: 'pre-wrap',
-                    }}>
-                      {msg.thinking && <Spin size="small" style={{ marginRight: 8 }} />}
-                      {msg.content}
-                    </Paragraph>
+                    {msg.thinking && (
+                      <Paragraph style={{
+                        margin: 0,
+                        color: 'rgba(224,245,232,0.45)',
+                        fontSize: 13,
+                        whiteSpace: 'pre-wrap',
+                      }}>
+                        <Spin size="small" style={{ marginRight: 8 }} />
+                        {msg.content}
+                      </Paragraph>
+                    )}
+                    {!msg.thinking && (
+                      <div style={{ color: 'rgba(224,245,232,0.9)', fontSize: 13 }}>
+                        <MessageBody content={msg.content} />
+                      </div>
+                    )}
                     <Text style={{ fontSize: 10, color: 'rgba(224,245,232,0.25)' }}>
                       {msg.timestamp}
                       {msg.offline && (

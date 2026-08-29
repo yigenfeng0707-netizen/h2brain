@@ -25,4 +25,11 @@ if [ -n "$LLM_FALLBACK_API_KEY" ]; then
     echo "LLM_FALLBACK_MODEL=${LLM_FALLBACK_MODEL:-step-3.7-flash}" >> "$ENV_FILE"
 fi
 
+# 图像生成: 商汤 SenseNova（运营周报配图）
+if [ -n "$IMAGE_API_KEY" ]; then
+    echo "IMAGE_API_KEY=$IMAGE_API_KEY" >> "$ENV_FILE"
+    echo "IMAGE_BASE_URL=${IMAGE_BASE_URL:-https://token.sensenova.cn/v1}" >> "$ENV_FILE"
+    echo "IMAGE_MODEL=${IMAGE_MODEL:-sensenova-u1.5-lite}" >> "$ENV_FILE"
+fi
+
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

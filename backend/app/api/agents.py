@@ -129,6 +129,42 @@ class AgentExecRequest(BaseModel):
     context: dict | None = Field(None, description="Additional context (optional)")
 
 
+class ReportImageRequest(BaseModel):
+    """运营周报配图生成请求。"""
+
+    theme: str | None = Field(None, description="配图主题侧重（可选），如 '碳减排'")
+
+
+@router.post("/agents/report-image", tags=["Agents"])
+def generate_report_image(req: ReportImageRequest):
+    """生成运营周报配图（商汤 SenseNova 图像模型 + 真实 KPI 提示词）。
+
+    返回 image_url（前端 <img> 直接引用）、完整提示词与 KPI 摘要，保证可解释性。
+    """
+    if not settings.image_enabled:
+        raise HTTPException(status_code=503, detail="图像生成未配置（缺少 IMAGE_API_KEY）")
+    try:
+        from ..report_image import generate_report_image as _gen
+
+        return _gen(req.theme or "")
+    except Exception as e:  # noqa: BLE001
+        logger.error("周报配图生成失败: %s", e)
+        raise HTTPException(status_code=502, detail=f"配图生成失败: {e}")
+
+
+@router.get("/agents/report-image/{image_id}", tags=["Agents"])
+def get_report_image(image_id: str):
+    """按 id 获取已生成的周报配图（PNG 二进制）。"""
+    from fastapi.responses import Response
+
+    from ..report_image import get_image_bytes
+
+    png = get_image_bytes(image_id)
+    if png is None:
+        raise HTTPException(status_code=404, detail="配图不存在或已过期，请重新生成")
+    return Response(content=png, media_type="image/png")
+
+
 @router.get("/agents", tags=["Agents"])
 def list_agents():
     """List all six agents"""
