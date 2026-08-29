@@ -230,6 +230,8 @@ def compute_value_analysis(
             "diesel_co2_kg_per_l": DIESEL_CO2_KG_PER_L,
             "h2_maintenance_yuan_per_km": H2_MAINTENANCE_YUAN_PER_KM,
             "diesel_maintenance_yuan_per_km": DIESEL_MAINTENANCE_YUAN_PER_KM,
+            "annual_mileage_km": ANNUAL_MILEAGE_KM,
+            "vehicle_lifetime_years": VEHICLE_LIFETIME_YEARS,
         },
         # Per-vehicle breakdown
         "per_vehicle": per_vehicle,

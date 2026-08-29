@@ -324,6 +324,10 @@ export default function ValueAnalysis() {
               <RiseOutlined style={{ marginRight: 8 }} />
               8年全生命周期成本与累计节省趋势
             </h3>
+            <Text style={{ color: 'rgba(224,245,232,0.45)', fontSize: 11, display: 'block', marginBottom: 8 }}>
+              模型推演：实测 18 天单位经济性 × 行业年化参数（年里程 10 万 km/辆、寿命 8 年），非 8 年实测数据；
+              假设各年成本水平不变（未计入氢价走势与电堆衰减）
+            </Text>
             <ReactECharts option={annualChart} style={{ height: 300 }} />
           </div>
         </Col>
@@ -383,6 +387,12 @@ export default function ValueAnalysis() {
               item: '年度推演',
               formula: `按 ${ann.annual_km_per_vehicle.toLocaleString()} km/辆/年 × ${ds.vehicle_count} 辆等比缩放实测数据`,
               source: '年里程为重卡行业均值参数；实测数据周期 18 天',
+            },
+            {
+              key: '5b',
+              item: '生命周期推演',
+              formula: `年节省 × ${roi.lifetime_years} 年 − 购车溢价 = 全生命周期净节省 ${fmtYuan(roi.lifetime_savings_yuan)}`,
+              source: '车辆寿命 8 年为重卡行业惯例参数（比赛数据包仅含 18 天实测，不含多年数据）',
             },
             {
               key: '6',
