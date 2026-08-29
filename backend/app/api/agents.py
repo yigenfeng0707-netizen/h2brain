@@ -136,20 +136,33 @@ class ReportImageRequest(BaseModel):
 
 
 @router.post("/agents/report-image", tags=["Agents"])
-def generate_report_image(req: ReportImageRequest):
-    """生成运营周报配图（商汤 SenseNova 图像模型 + 真实 KPI 提示词）。
+def submit_report_image(req: ReportImageRequest):
+    """提交运营周报配图生成任务（异步）。
 
-    返回 image_url（前端 <img> 直接引用）、完整提示词与 KPI 摘要，保证可解释性。
+    图像生成耗时 10-120 秒不可控，同步等待会被网关 504 切断，
+    故立即返回 task_id，前端轮询 GET /agents/report-image/task/{task_id}。
     """
     if not settings.image_enabled:
         raise HTTPException(status_code=503, detail="图像生成未配置（缺少 IMAGE_API_KEY）")
-    try:
-        from ..report_image import generate_report_image as _gen
+    from ..report_image import submit_report_image as _submit
 
-        return _gen(req.theme or "")
-    except Exception as e:  # noqa: BLE001
-        logger.error("周报配图生成失败: %s", e)
-        raise HTTPException(status_code=502, detail=f"配图生成失败: {e}")
+    task_id = _submit(req.theme or "")
+    return {
+        "task_id": task_id,
+        "status": "generating",
+        "poll_url": f"/api/v1/agents/report-image/task/{task_id}",
+    }
+
+
+@router.get("/agents/report-image/task/{task_id}", tags=["Agents"])
+def get_report_image_task(task_id: str):
+    """查询配图任务状态（generating / done / failed）。done 时含 image_url、提示词与 KPI。"""
+    from ..report_image import get_task
+
+    task = get_task(task_id)
+    if task is None:
+        raise HTTPException(status_code=404, detail="任务不存在或已过期")
+    return task
 
 
 @router.get("/agents/report-image/{image_id}", tags=["Agents"])

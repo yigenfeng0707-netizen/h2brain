@@ -146,3 +146,54 @@ def get_image_bytes(image_id: str) -> bytes | None:
         if png is not None:
             _image_store.move_to_end(image_id)
         return png
+
+
+# ---------------------------------------------------------------------------
+# 异步任务模式（防止网关 504）
+# 图像生成耗时不可控（10-120s），同步等待会被魔搭网关在 ~120s 切断。
+# POST 立即返回 task_id，后台线程生成，前端轮询 GET task 状态。
+# ---------------------------------------------------------------------------
+
+_tasks: dict[str, dict[str, Any]] = {}
+_task_lock = threading.Lock()
+_MAX_TASKS = 50
+
+
+def submit_report_image(theme: str = "") -> str:
+    """提交配图生成任务（后台线程执行），立即返回 task_id。"""
+    task_id = uuid.uuid4().hex[:12]
+    task = {
+        "task_id": task_id,
+        "status": "generating",
+        "theme": theme or "运营周报总览",
+        "created_at": time.time(),
+    }
+    with _task_lock:
+        _tasks[task_id] = task
+        # 淘汰旧的已完成任务，防膨胀
+        done_old = [k for k, v in _tasks.items()
+                    if v["status"] in ("done", "failed") and k != task_id]
+        for k in done_old[:-_MAX_TASKS + 1]:
+            _tasks.pop(k, None)
+
+    def _worker():
+        try:
+            info = generate_report_image(theme)
+            with _task_lock:
+                _tasks[task_id].update({"status": "done", **info})
+        except Exception as e:  # noqa: BLE001
+            logger.error("配图任务 %s 失败: %s", task_id, e)
+            with _task_lock:
+                _tasks[task_id].update(
+                    {"status": "failed", "error": str(e)[:300]}
+                )
+
+    threading.Thread(target=_worker, daemon=True).start()
+    return task_id
+
+
+def get_task(task_id: str) -> dict[str, Any] | None:
+    """查询配图任务状态: generating / done / failed。"""
+    with _task_lock:
+        task = _tasks.get(task_id)
+        return dict(task) if task else None

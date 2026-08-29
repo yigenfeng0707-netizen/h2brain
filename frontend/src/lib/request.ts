@@ -44,9 +44,9 @@ export const apiPost = {
     api.post(`/agents/${agentKey}/execute`, data, { timeout: 300000 }),
   analysisUpload: (data: FormData) =>
     api.post('/analysis/upload', data, { timeout: 120000 }),
-  // 运营周报配图（商汤图像模型，出图约 10-60 秒）
+  // 运营周报配图（异步任务: 提交立即返回 task_id，前端轮询状态）
   reportImage: (data: { theme?: string }) =>
-    api.post('/agents/report-image', data, { timeout: 180000 }),
+    api.post('/agents/report-image', data, { timeout: 30000 }),
 }
 
 // Agent SSE 流式执行: 后端逐事件推送, 免疫网关/axios超时

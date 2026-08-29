@@ -2,7 +2,7 @@
 import { useEffect, useState, useRef } from 'react'
 import { Spin, Empty, Tag, Row, Col, Input, Button, Card, Space, Typography, Tooltip } from 'antd'
 import { SendOutlined, RobotOutlined, UserOutlined, BulbOutlined, CheckCircleOutlined, PictureOutlined } from '@ant-design/icons'
-import { apiGet, apiPost, agentExecuteStream } from '@/lib/request'
+import api, { apiGet, apiPost, agentExecuteStream } from '@/lib/request'
 
 const { Text, Paragraph } = Typography
 
@@ -125,6 +125,7 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
   const presets = PRESET_QUESTIONS[agentKey] || []
 
   // 一键生成运营周报配图（商汤图像模型 + 真实 KPI 提示词）
+  // 异步任务模式: 提交拿 task_id -> 轮询状态 -> 完成后渲染（防网关 504）
   const generateReportImage = async () => {
     if (imgLoading) return
     const ts = () => new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
@@ -135,9 +136,23 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
       timestamp: ts(), thinking: true, key: msgId,
     }])
     setImgLoading(true)
+    const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
     try {
+      // 1) 提交任务（立即返回）
       const res = await apiPost.reportImage({})
-      const d = res.data || {}
+      const taskId = res.data?.task_id
+      if (!taskId) throw new Error('未返回任务 ID')
+      // 2) 轮询状态（每 3 秒，上限 150 秒）
+      let d: any = null
+      for (let i = 0; i < 50; i++) {
+        await sleep(3000)
+        const st = await api.get(`/agents/report-image/task/${taskId}`, { timeout: 15000 })
+        d = st.data
+        if (d?.status === 'failed') throw new Error(d?.error || '生成失败')
+        if (d?.status === 'done') break
+      }
+      if (!d || d.status !== 'done') throw new Error('生成超时，请稍后重试')
+      // 3) 渲染结果
       const body = [
         `运营周报配图已生成（主题：${d.theme || '运营周报总览'}）`,
         '',
