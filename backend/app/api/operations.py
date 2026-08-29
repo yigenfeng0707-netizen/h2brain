@@ -19,8 +19,8 @@ from ..mock_data import get_pool_summary, get_stations
 
 router = APIRouter()
 
-# 柴油重卡对标: 31T 柴油车 ~35L/100km, 柴油 2.68 kg CO2/L → 0.94 kg CO2/km
-DIESEL_CO2_PER_KM = 0.94
+# 柴油重卡对标（与 value_analysis.py 口径统一）: 49T 柴油车 30L/100km × 2.63 kg CO2/L → 0.789 kg CO2/km
+DIESEL_CO2_PER_KM = 0.789
 
 _events_cache: dict = {}
 _trends_cache: dict = {}

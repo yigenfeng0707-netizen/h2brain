@@ -349,13 +349,60 @@ export default function ValueAnalysis() {
         </Col>
       </Row>
 
-      {/* 参数说明 */}
-      <div className="h2-panel" style={{ padding: 12 }}>
-        <Text style={{ color: 'rgba(224,245,232,0.35)', fontSize: 11 }}>
-          计算参数：氢价 {data.parameters.h2_price_yuan_per_kg} 元/kg | 柴油价 {data.parameters.diesel_price_yuan_per_l} 元/L |
-          柴油车油耗 {data.parameters.diesel_consumption_l_per_100km} L/100km | 柴油CO2排放因子 {data.parameters.diesel_co2_kg_per_l} kg/L |
-          H2维护 {data.parameters.h2_maintenance_yuan_per_km} 元/km | 柴油维护 {data.parameters.diesel_maintenance_yuan_per_km} 元/km |
-          年里程 {ann.annual_km_per_vehicle.toLocaleString()} km/辆 | 车辆寿命 {roi.lifetime_years} 年
+      {/* 计算方法与公式说明 */}
+      <div className="h2-panel" style={{ padding: 16 }}>
+        <h3 style={{ color: '#69F0AE', marginBottom: 12 }}>计算方法与公式说明（可解释性）</h3>
+        <Table
+          dataSource={[
+            {
+              key: '1',
+              item: '氢燃料成本',
+              formula: `总氢耗 ${ds.total_h2_consumed_kg} kg × 氢价 ${data.parameters.h2_price_yuan_per_kg} 元/kg = ${fmtYuan(eco.h2_fuel_cost_yuan)}`,
+              source: '总氢耗为 T05 官方数据包遥测累计氢耗列差分汇总（真实值）；氢价为行业均价参数',
+            },
+            {
+              key: '2',
+              item: '柴油等效燃料成本',
+              formula: `总里程 ${fmtKm(ds.total_distance_km)} ÷ 100 × 油耗 ${data.parameters.diesel_consumption_l_per_100km} L/100km × 油价 ${data.parameters.diesel_price_yuan_per_l} 元/L = ${fmtYuan(eco.diesel_fuel_cost_yuan)}`,
+              source: '对标同吨位柴油重卡（30L/100km），里程为真实值',
+            },
+            {
+              key: '3',
+              item: '成本节省',
+              formula: `(柴油燃料+柴油维护) - (氢燃料+氢维护) = ${fmtYuan(eco.cost_saved_yuan)}（降幅 ${eco.cost_reduction_pct}%）`,
+              source: `维护单价：氢 ${data.parameters.h2_maintenance_yuan_per_km} 元/km vs 柴油 ${data.parameters.diesel_maintenance_yuan_per_km} 元/km（行业参数）`,
+            },
+            {
+              key: '4',
+              item: 'CO2 减排（绿氢口径）',
+              formula: `柴油CO2(里程÷100×油耗×${data.parameters.diesel_co2_kg_per_l} kg/L) - 绿氢CO2(≈0) = ${fmtKg(emi.co2_reduced_green_kg)}`,
+              source: '柴油排放因子 2.63 kg/L（国标口径）；绿氢按井口到车轮近零排放计',
+            },
+            {
+              key: '5',
+              item: '年度推演',
+              formula: `按 ${ann.annual_km_per_vehicle.toLocaleString()} km/辆/年 × ${ds.vehicle_count} 辆等比缩放实测数据`,
+              source: '年里程为重卡行业均值参数；实测数据周期 18 天',
+            },
+            {
+              key: '6',
+              item: '投资回收期',
+              formula: `车辆溢价 ${fmtYuan(roi.vehicle_premium_yuan)}/辆 × ${ds.vehicle_count} 辆 ÷ 年节省 ${fmtYuan(ann.annual_cost_saved)} = ${roi.payback_years ?? '∞'} 年`,
+              source: '氢能重卡较同级柴油车约贵 30 万（市场公开报价口径）',
+            },
+          ]}
+          columns={[
+            { title: '计算项', dataIndex: 'item', key: 'item', width: 150, render: (t: string) => <span style={{ color: '#69F0AE', fontWeight: 600 }}>{t}</span> },
+            { title: '计算公式与代入过程', dataIndex: 'formula', key: 'formula', render: (t: string) => <span style={{ color: 'rgba(224,245,232,0.8)', fontSize: 12 }}>{t}</span> },
+            { title: '数据来源 / 参数性质', dataIndex: 'source', key: 'source', width: 340, render: (t: string) => <span style={{ color: 'rgba(224,245,232,0.45)', fontSize: 11 }}>{t}</span> },
+          ]}
+          pagination={false}
+          size="small"
+          style={{ background: 'transparent' }}
+        />
+        <Text style={{ color: 'rgba(224,245,232,0.35)', fontSize: 11, display: 'block', marginTop: 12 }}>
+          方法说明：里程、氢耗取自 T05 官方数据包真实遥测；价格与排放因子为行业公开均值参数（已在公式中逐项代入）。
+          柴油对标车型假设 49 吨级、30L/100km。绿氢口径下氢燃料电池车全生命周期尾气与井口排放近似为零。
         </Text>
       </div>
     </div>

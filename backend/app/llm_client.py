@@ -136,9 +136,32 @@ def _call_with_retries(
                         f"LLM API returned {resp.status_code}: {resp.text[:300]}"
                     )
                 data = resp.json()
-                content = data["choices"][0]["message"]["content"]
+                message = data["choices"][0]["message"]
+                content = message.get("content") or ""
+                finish_reason = data["choices"][0].get("finish_reason", "")
                 if not content:
+                    # 推理模型 (step 系列/deepseek-r1): 思维链在 reasoning_content
+                    # 若 reasoning 耗尽 token, content 可能为空 → 用 reasoning 兜底
+                    reasoning = message.get("reasoning_content") or ""
+                    if reasoning:
+                        logger.warning(
+                            "LLM content 为空 (finish_reason=%s), 使用 reasoning_content 兜底 (%d 字符)",
+                            finish_reason,
+                            len(reasoning),
+                        )
+                        return reasoning.strip()
                     raise RuntimeError("LLM returned empty content")
+                # 截断保护: finish_reason=length 时 content 可能是不完整 JSON
+                if finish_reason == "length":
+                    logger.warning(
+                        "LLM 输出被 max_tokens 截断 (finish_reason=length), 尝试补全"
+                    )
+                    # 截尾到最近的完整 JSON 对象边界
+                    trimmed = content.rstrip()
+                    for closer in ("}}", "}"):
+                        idx = trimmed.rfind(closer)
+                        if idx != -1:
+                            return trimmed[: idx + len(closer)].strip()
                 return content.strip()
 
         except httpx.TimeoutException as e:

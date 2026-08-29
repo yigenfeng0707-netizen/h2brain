@@ -22,75 +22,76 @@ router = APIRouter()
 
 SCENARIOS = {
     "hydrogen_optimization": {
-        "name": "Hydrogen Consumption Optimization",
-        "desc": "Analyze vehicle hydrogen consumption anomalies and provide optimization recommendations",
-        "query_hint": "jingA-H2308 recent fuel consumption is high, please analyze and recommend optimizations",
+        "name": "氢耗优化",
+        "desc": "分析车辆氢耗异常（基于 T05 官方数据包真实遥测）并给出优化建议",
+        "query_hint": "V1 车辆最近氢耗偏高，请分析原因并给出优化建议",
     },
     "route_planning": {
-        "name": "Route Planning",
-        "desc": "Plan optimal refueling and transport routes for vehicles",
-        "query_hint": "jingB-H0816 needs to go from Daxing to Tianjin Port, hydrogen at 40%, please plan the route",
+        "name": "路径规划",
+        "desc": "结合加氢站分布与剩余氢量规划安全运输路线（调度沙盘推演）",
+        "query_hint": "氢量 40% 的车辆要跑长途，请规划安全路线",
     },
     "station_dispatch": {
-        "name": "Station Dispatch",
-        "desc": "Recommend the best refueling station to reduce waiting time",
-        "query_hint": "Which station near Yizhuang has the shortest queue? Lowest hydrogen price?",
+        "name": "加氢站调度",
+        "desc": "推荐最优加氢站以减少排队等待（调度沙盘推演）",
+        "query_hint": "附近哪个加氢站排队最短？氢价最低的是哪家？",
     },
     "cost_analysis": {
-        "name": "Cost Analysis",
-        "desc": "Analyze operating cost structure and provide cost reduction recommendations",
-        "query_hint": "What proportion is hydrogen cost in the fleet this month? How to reduce it?",
+        "name": "成本分析",
+        "desc": "分析运营成本结构（真实数据测算），给出降本建议",
+        "query_hint": "当前车队的氢燃料成本占比是多少？如何降低？",
     },
     "fleet_management": {
-        "name": "Fleet Management",
-        "desc": "Fleet capacity scheduling and optimization",
-        "query_hint": "Today there are 8 pending orders and 5 available vehicles, how to assign them?",
+        "name": "车队管理",
+        "desc": "车队运力调度与订单-车辆匹配优化（调度沙盘推演）",
+        "query_hint": "当前有多个待分配订单，如何分配车辆最优？",
     },
 }
 
 # Offline samples (used when LLM is not configured or as fallback)
+# 注意：离线样本仅供无 LLM 时的演示，均为基于真实数据口径的示例结论，并明确标注「离线示例」
 OFFLINE_SAMPLE = {
     "hydrogen_optimization": ReactResponse(
         scenario="hydrogen_optimization",
         steps=[
             ReactStep(
-                thought="The user is asking about high fuel consumption for jingA-H2308, I need to check the vehicle's operating data",
-                action="query_vehicle(plate='jingA-H2308')",
-                observation="Consumption 11.2kg/100km (fleet avg 9.1kg), 23% above average. Recent 3 days mainly heavy-load uphill routes, driving score 72 (low)",
+                thought="用户询问 V1 车辆氢耗偏高，我先查询真实遥测数据中的车辆行程概况",
+                action="query_vehicle(vehicle_id='V1')",
+                observation="车辆V1（测试车辆1#，湖北襄阳）｜数据期共数十万行遥测｜多个行程｜平均百公里氢耗按 总氢耗÷总里程×100 计算",
             ),
             ReactStep(
-                thought="Possible causes for high consumption: 1. Heavy-load uphill routes 2. Aggressive driving 3. Fuel cell efficiency degradation",
-                action="analyze_factors(vehicle='jingA-H2308', dimensions=['route', 'driving', 'fuelcell'])",
-                observation="Route contribution +15%, driving behavior +6%, fuel cell efficiency decline +2%. Main factor is route heavy-load",
+                thought="需要定位氢耗偏高的具体行程与工况成因",
+                action="analyze_real_trips(vehicle_id='V1')",
+                observation="行程列表（真实遥测）：各行程里程、时长、均速、氢耗与百公里氢耗；偏离均值较高的行程集中在重载与爬坡工况段",
             ),
             ReactStep(
-                thought="Provide targeted optimization recommendations: route optimization, driving guidance, fuel cell inspection",
-                action="generate_recommendations()",
-                observation="Recommendations: 1. Avoid G106 K35-K42 continuous uphill, take Jingjin Expressway instead 2. Train driver on smooth acceleration 3. Schedule fuel cell health check",
+                thought="对高氢耗行程做分段归因分析（工况分段+驾驶行为）",
+                action="analyze_real_trip_detail(vehicle_id='V1', trip_id=高偏离行程)",
+                observation="工况分段显示爬坡/重载段百公里氢耗显著高于均值（判定方法：分段氢耗偏离均值超阈值）；驾驶行为统计显示急加速频次偏高",
             ),
         ],
-        final_answer="jingA-H2308 consumption is 11.2kg/100km, 23% above fleet average. Main causes: heavy-load uphill routes in recent 3 days (+15%), low driving score (+6%). Recommendations: 1. Route optimization to avoid continuous uphill, expected savings 1.8kg/100km; 2. Smooth acceleration training, expected savings 0.7kg/100km; 3. Schedule fuel cell health check. After comprehensive optimization, expected reduction to 8.7kg/100km, monthly savings ~2,800 yuan.",
+        final_answer="（离线示例）V1 车辆氢耗偏高的主要成因为重载爬坡工况占比高与急加速驾驶行为：分段分析显示爬坡段百公里氢耗明显偏离均值（判定方法见行程分析）。建议：1. 路线规划避开连续爬坡路段；2. 开展平顺加减速驾驶培训；3. 关注燃料电池健康度变化。启用 LLM 后可获得基于实时数据的针对性量化分析。",
     ),
     "route_planning": ReactResponse(
         scenario="route_planning",
         steps=[
             ReactStep(
-                thought="User needs to plan a route from Daxing to Tianjin Port for jingB-H0816, hydrogen at 40%",
-                action="query_vehicle(plate='jingB-H0816')",
-                observation="Remaining hydrogen 40%, range ~180km. Daxing to Tianjin Port ~150km, direct route feasible but hydrogen is tight",
+                thought="用户需要为氢量 40% 的车辆规划长途路线，先查询车辆状态",
+                action="query_vehicle(vehicle_id='V1')",
+                observation="车辆当前氢量约 40%，按百公里氢耗可推算安全续航里程（安全续航 = 剩余氢量÷百公里氢耗×100×安全系数）",
             ),
             ReactStep(
-                thought="Need to confirm refueling stations along the route for safety margin",
-                action="search_stations(route='Daxing-Tianjin Port', radius=5)",
-                observation="Tongzhou Logistics Port Station (HRS-005) is mid-route, 55km from start, no queue, price 34 yuan/kg",
+                thought="确认沿途可用加氢站（调度沙盘数据）",
+                action="query_stations()",
+                observation="加氢站列表（调度推演沙盘数据）：各站储氢、排队、氢价与位置信息",
             ),
             ReactStep(
-                thought="Recommended plan: refuel at Tongzhou station first, then direct to Tianjin Port",
-                action="optimize_route(via='HRS-005')",
-                observation="Recommended route: Daxing -> Tongzhou Logistics Port Station (refuel 30kg) -> Tianjin Port. Total 152km, arrival hydrogen 55%, estimated cost 1,020 yuan",
+                thought="推荐先在途中加氢站补氢，再直达目的地的方案",
+                action="plan_route(vehicle_plate='V1', dest_lng=..., dest_lat=...)",
+                observation="路径规划（沙盘推演）：推荐途中补氢方案，总里程、到站氢量与预估成本见规划结果",
             ),
         ],
-        final_answer="Recommended route: Daxing -> Tongzhou Logistics Port Station (HRS-005, refuel 30kg) -> Tianjin Port. Total 152km, arrival hydrogen 55%, sufficient safety margin. Station has no queue, price 34 yuan/kg, estimated cost 1,020 yuan. Compared to direct route (only 5% hydrogen on arrival), safety is greatly improved.",
+        final_answer="（离线示例·调度沙盘推演）推荐路线：先在途中综合评分最优的加氢站补氢，再直达目的地。综合评分方法：距离、排队等待（Erlang C 模型预测）、氢价与储氢量多因子加权。启用 LLM 后可针对具体目的地实时规划。",
     ),
 }
 

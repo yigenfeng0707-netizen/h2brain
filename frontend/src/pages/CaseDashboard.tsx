@@ -1,8 +1,7 @@
-// 氢智行 H2Brain - 案例数据看板
+// 氢智行 H2Brain - 案例数据看板（真实数据回测 + 计算方法说明）
 import { useEffect, useState } from 'react'
-import { Row, Col, Spin, Empty } from 'antd'
+import { Row, Col, Spin, Empty, Table, Tag } from 'antd'
 import { apiGet } from '@/lib/request'
-import ReactECharts from 'echarts-for-react'
 
 export default function CaseDashboard() {
   const [caseData, setCaseData] = useState<any>(null)
@@ -16,35 +15,44 @@ export default function CaseDashboard() {
   }, [])
 
   if (loading) return <Spin size="large" style={{ display: 'flex', justifyContent: 'center', padding: 100 }} />
-  if (!caseData) return <Empty />
+  if (!caseData) return <Empty description="无法加载案例数据" />
 
-  const chart = {
-    tooltip: { trigger: 'axis' },
-    legend: { data: ['优化前', '优化后'], textStyle: { color: 'rgba(224,245,232,0.6)' } },
-    xAxis: { type: 'category', data: caseData.metrics.map((m: any) => m.name), axisLabel: { color: 'rgba(224,245,232,0.6)', rotate: 20 } },
-    yAxis: { type: 'value', axisLabel: { color: 'rgba(224,245,232,0.6)' } },
-    series: [
-      {
-        name: '优化前',
-        type: 'bar',
-        data: caseData.metrics.map((m: any) => {
-          const v = parseFloat(m.before)
-          return isNaN(v) ? 0 : v
-        }),
-        itemStyle: { color: '#FF6B35', borderRadius: [4, 4, 0, 0] },
-      },
-      {
-        name: '优化后',
-        type: 'bar',
-        data: caseData.metrics.map((m: any) => {
-          const v = parseFloat(m.after)
-          return isNaN(v) ? 0 : v
-        }),
-        itemStyle: { color: '#69F0AE', borderRadius: [4, 4, 0, 0] },
-      },
-    ],
-    grid: { left: '3%', right: '4%', bottom: '10%', containLabel: true },
-  }
+  const columns = [
+    {
+      title: '指标',
+      dataIndex: 'name',
+      key: 'name',
+      width: 140,
+      render: (t: string) => <span style={{ color: '#69F0AE', fontWeight: 600 }}>{t}</span>,
+    },
+    {
+      title: '基线',
+      dataIndex: 'before',
+      key: 'before',
+      width: 110,
+      render: (t: string) => <span style={{ color: '#FF6B35' }}>{t}</span>,
+    },
+    {
+      title: '成效',
+      dataIndex: 'after',
+      key: 'after',
+      width: 110,
+      render: (t: string) => <span style={{ color: '#69F0AE', fontWeight: 700 }}>{t}</span>,
+    },
+    {
+      title: '口径',
+      dataIndex: 'change',
+      key: 'change',
+      width: 130,
+      render: (t: string) => <Tag color="cyan">{t}</Tag>,
+    },
+    {
+      title: '计算方法 / 数据来源',
+      dataIndex: 'method',
+      key: 'method',
+      render: (t: string) => <span style={{ color: 'rgba(224,245,232,0.65)', fontSize: 12 }}>{t}</span>,
+    },
+  ]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -65,9 +73,7 @@ export default function CaseDashboard() {
                 <span style={{ color: '#69F0AE', fontWeight: 700 }}>{m.after}</span>
               </div>
               <div style={{ marginTop: 4 }}>
-                <span style={{ color: m.change.startsWith('-') || m.change.includes('新增') ? '#69F0AE' : '#00E5FF', fontSize: 12, fontWeight: 700 }}>
-                  {m.change}
-                </span>
+                <span style={{ color: '#00E5FF', fontSize: 12, fontWeight: 700 }}>{m.change}</span>
               </div>
             </div>
           </Col>
@@ -75,8 +81,19 @@ export default function CaseDashboard() {
       </Row>
 
       <div className="h2-panel" style={{ padding: 16 }}>
-        <h3 style={{ color: '#69F0AE', marginBottom: 8 }}>优化前后对比</h3>
-        <ReactECharts option={chart} style={{ height: 350 }} />
+        <h3 style={{ color: '#69F0AE', marginBottom: 12 }}>指标口径与计算方法（可解释性说明）</h3>
+        <Table
+          dataSource={caseData.metrics}
+          columns={columns}
+          rowKey="name"
+          pagination={false}
+          size="small"
+          style={{ background: 'transparent' }}
+        />
+        <p style={{ color: 'rgba(224,245,232,0.35)', fontSize: 11, marginTop: 12 }}>
+          说明：真实数据指标均来自 T05 官方数据包遥测回测；涉及经济与碳减排的完整参数、公式与年度推演见「价值量化分析」页；
+          加氢站调度与路径规划为沙盘推演演示数据。
+        </p>
       </div>
     </div>
   )

@@ -1,10 +1,9 @@
-"""H2Brain - Intelligent Optimization API
+"""氢智行 H2Brain - 智能优化接口
 
-Endpoints for:
-- Fuel cell health analysis (voltage, thermal, efficiency, degradation, RUL)
-- Route planning (hydrogen sufficiency, refuel stops, cost estimation)
-- Station dispatch (M/M/c queueing, ranked recommendation)
-- Fleet optimization (multi-objective order-vehicle matching)
+- 燃料电池健康分析（电压/热应力/效率/衰减/RUL，真实遥测）
+- 路径规划（氢量续航检查、途中加氢推荐、成本预估，沙盘推演）
+- 加氢站调度（M/M/c 排队论，排序推荐，沙盘推演）
+- 车队优化（多目标订单-车辆匹配，沙盘推演）
 """
 
 from __future__ import annotations

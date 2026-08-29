@@ -1,9 +1,9 @@
-"""H2Brain - Real Data Analysis API
+"""氢智行 H2Brain - 真实数据分析接口
 
-Endpoints for hydrogen vehicle trip analysis:
-- Vehicle list, trip list, trip detail
-- Anomaly detection, factor analysis, driving behaviors
-- Trip benchmarking, auto report generation, CSV upload
+基于 T05 官方数据包遥测的行程分析：
+- 车辆列表、行程列表、行程详情
+- 异常检测、影响因素归因、驾驶行为分析
+- 同类行程氢耗对标、一键生成报告、CSV 上传
 """
 
 import json
@@ -55,7 +55,7 @@ def analysis_trips(vehicle_id: str):
     processor = get_processor()
     trips = processor.get_trips(vehicle_id)
     if not trips:
-        raise HTTPException(status_code=404, detail=f"Vehicle {vehicle_id} not found")
+        raise HTTPException(status_code=404, detail=f"未找到车辆 {vehicle_id} 的行程数据")
     return _json_response(trips)
 
 
@@ -66,7 +66,7 @@ def analysis_trip_detail(vehicle_id: str, trip_id: int):
     detail = processor.get_trip_detail(vehicle_id, trip_id)
     if detail is None:
         raise HTTPException(
-            status_code=404, detail=f"Trip {trip_id} of {vehicle_id} not found"
+            status_code=404, detail=f"未找到车辆 {vehicle_id} 的行程 {trip_id}"
         )
     return _json_response(detail)
 
@@ -86,7 +86,7 @@ def analysis_report(vehicle_id: str, trip_id: int):
     report = processor.get_report(vehicle_id, trip_id)
     if report is None:
         raise HTTPException(
-            status_code=404, detail=f"Trip {trip_id} of {vehicle_id} not found"
+            status_code=404, detail=f"未找到车辆 {vehicle_id} 的行程 {trip_id}"
         )
     return _json_response(report)
 
@@ -95,7 +95,7 @@ def analysis_report(vehicle_id: str, trip_id: int):
 async def analysis_upload(file: UploadFile = File(...)):
     """上传CSV车辆数据文件并自动分析"""
     if not file.filename.endswith(".csv"):
-        raise HTTPException(status_code=400, detail="Only CSV files are supported")
+        raise HTTPException(status_code=400, detail="仅支持 CSV 文件")
 
     # Save to temp file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".csv") as tmp:
@@ -108,7 +108,7 @@ async def analysis_upload(file: UploadFile = File(...)):
         result = processor.process_uploaded_csv(tmp_path)
         return _json_response(result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Processing failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"处理失败: {str(e)}")
 
 
 @router.get("/analysis/thresholds", tags=["真实数据分析"])
@@ -141,7 +141,7 @@ def calibrate_thresholds():
 
 @router.get("/analysis/value", tags=["真实数据分析"])
 def get_value_analysis():
-    """Compute economic benefits and emission reduction from real fleet data."""
+    """基于真实车队数据计算经济效益与碳减排（含公式与参数说明）"""
     processor = get_processor()
     vehicles = processor.get_vehicles()
     all_trips = []
@@ -155,15 +155,14 @@ def get_value_analysis():
 
 @router.get("/analysis/validation", tags=["真实数据分析"])
 def get_validation_report(vehicle_id: str = "V2"):
-    """Validate automatic trip segmentation against manual ground-truth records.
+    """校验自动行程切分与人工记录的一致性
 
-    Compares algorithm output with the official manual record spreadsheet
-    ("测试车辆2#手工行程及工况记录表.xlsx") provided in the T05 data package.
-    Reports trip count match, mileage deviation, per-trip MAPE, and work-condition
-    classification agreement rate.
+    将算法输出与 T05 数据包中的官方手工记录表
+    （"测试车辆2#手工行程及工况记录表.xlsx"）逐行程比对，
+    输出行程数匹配、里程偏差、单车行程 MAPE 与工况分类吻合率。
     """
     try:
         result = validate_trip_segmentation(vehicle_id)
         return _json_response(result)
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Validation failed: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"校验失败: {str(e)}")

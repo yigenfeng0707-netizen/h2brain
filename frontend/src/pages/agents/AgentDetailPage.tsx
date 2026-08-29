@@ -107,23 +107,8 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
         : m))
     }
 
-    try {
-      await agentExecuteStream(agentKey, { query: question }, (ev) => {
-        if (ev.type === 'step') {
-          const action = ev.action ? String(ev.action).split('(')[0] : ''
-          updateThinking(`步骤 ${ev.index + 1}: ${action || '分析中'}…\n${ev.observation ? String(ev.observation).slice(0, 120) : ''}`)
-        } else if (ev.type === 'final') {
-          replaceWithAnswer(String(ev.answer ?? ''))
-        } else if (ev.type === 'error') {
-          replaceWithAnswer(`推理失败: ${ev.message || '未知错误'}，请重试。`)
-        }
-      })
-      // 兜底: 流结束但思考气泡未被替换(如 final 缺失)
-      setMessages(prev => prev.map(m => (m as any).key === thinkingId && m.thinking
-        ? { ...m, content: '推理已完成但未返回结论，请重试。', thinking: false }
-        : m))
-    } catch {
-      // 流式彻底失败(网络/路由) -> 降级到 POST 重试一次
+    // POST 降级重试: 流式失败或未返回结论时, 同步接口再试一次
+    const postFallback = async () => {
       try {
         const res = await apiPost.agentExecute(agentKey, { query: question })
         const result = res.data?.result || {}
@@ -135,6 +120,27 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
       } catch {
         replaceWithAnswer('智能体请求失败，请稍后重试或检查网络连接。')
       }
+    }
+
+    try {
+      let gotConclusion = false
+      await agentExecuteStream(agentKey, { query: question }, (ev) => {
+        if (ev.type === 'step') {
+          const action = ev.action ? String(ev.action).split('(')[0] : ''
+          updateThinking(`步骤 ${ev.index + 1}: ${action || '分析中'}…\n${ev.observation ? String(ev.observation).slice(0, 120) : ''}`)
+        } else if (ev.type === 'final') {
+          gotConclusion = true
+          replaceWithAnswer(String(ev.answer ?? ''))
+        } else if (ev.type === 'error') {
+          gotConclusion = true
+          replaceWithAnswer(`推理失败: ${ev.message || '未知错误'}，请重试。`)
+        }
+      })
+      // 兜底: 流结束但未收到 final 事件 -> 自动降级 POST 重试一次
+      if (!gotConclusion) await postFallback()
+    } catch {
+      // 流式彻底失败(网络/路由) -> 降级到 POST 重试一次
+      await postFallback()
     } finally {
       setAsking(false)
     }

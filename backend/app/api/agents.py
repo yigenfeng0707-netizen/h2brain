@@ -24,93 +24,93 @@ router = APIRouter()
 AGENTS_DATA = [
     {
         "key": "hydrogen_opt",
-        "name": "Hydrogen Consumption Optimization Agent",
-        "icon": "h2",
-        "metric": "Consumption -12% per 100km",
-        "desc": "Multi-dimensional analysis based on vehicle load, road conditions, weather, and driving behavior to recommend optimal driving parameters and reduce hydrogen consumption per 100km.",
+        "name": "氢耗优化智能体",
+        "icon": "H2",
+        "metric": "28 个行程全覆盖分析",
+        "desc": "基于车辆载荷、路况（多维证据矩阵分类）、驾驶行为的氢耗多维分析，输出可解释的百公里氢耗异常成因与节能建议（数据来源：T05 官方数据包真实遥测）。",
         "capabilities": [
-            "Real-time consumption monitoring and anomaly detection",
-            "Road-condition-based speed optimization recommendations",
-            "Driving behavior scoring and energy-saving guidance",
-            "Historical consumption trend analysis and benchmarking",
+            "行程级氢耗监测与异常识别（偏离度阈值法）",
+            "基于工况分类的分段氢耗对标分析",
+            "驾驶行为评分与节能驾驶建议",
+            "历史氢耗趋势分析与车辆间对比",
         ],
-        "tech": "LLM + RAG + Time Series Prediction",
+        "tech": "LLM 推理 + 多维证据矩阵工况分类",
         "scenario": "hydrogen_optimization",
     },
     {
         "key": "route_plan",
-        "name": "Route Planning Agent",
-        "icon": "route",
-        "metric": "Range matching rate 98%+",
-        "desc": "Integrates refueling station distribution, remaining hydrogen, and order destinations to plan optimal transport routes ensuring vehicles never run out of hydrogen.",
+        "name": "路径规划智能体",
+        "icon": "路",
+        "metric": "安全续航圈推演",
+        "desc": "结合加氢站分布、剩余氢量与订单目的地，规划安全经济的运输路线，确保车辆不因缺氢停驶（调度沙盘推演演示）。",
         "capabilities": [
-            "Safety range circle calculation based on hydrogen level",
-            "Multi-station route optimization",
-            "Real-time traffic and congestion avoidance",
-            "Multi-order串联 route optimization",
+            "基于剩余氢量的安全续航圈计算",
+            "多站点路线优化与途中加氢推荐",
+            "行程成本预估（距离×氢耗×氢价）",
+            "多订单串联路线优化",
         ],
-        "tech": "Haversine Distance + Range Circle + Multi-station Optimization",
+        "tech": "Haversine 距离 + 续航圈 + 多站点优化",
         "scenario": "route_planning",
     },
     {
         "key": "station_dispatch",
-        "name": "Station Dispatch Agent",
-        "icon": "station",
-        "metric": "Wait time -60%",
-        "desc": "Monitors real-time station queues and intelligently assigns vehicles to optimal stations, reducing waiting time.",
+        "name": "加氢站调度智能体",
+        "icon": "站",
+        "metric": "Erlang C 排队等待预测",
+        "desc": "监测各加氢站排队状态，基于排队论模型预测等待时间，智能推荐最优加氢站点（调度沙盘推演演示）。",
         "capabilities": [
-            "Real-time station queue prediction",
-            "Dynamic分流 and off-peak scheduling",
-            "Hydrogen price comparison and cost optimization",
-            "Storage warning and restock recommendations",
+            "加氢站实时排队与等待时间预测",
+            "动态分流与错峰调度建议",
+            "氢价对比与加氢成本优化",
+            "储氢量预警与补货建议",
         ],
-        "tech": "M/M/c Erlang C Queuing Theory + Multi-factor Scoring",
+        "tech": "M/M/c Erlang C 排队论 + 多因子评分",
         "scenario": "station_dispatch",
     },
     {
         "key": "fleet_manage",
-        "name": "Fleet Management Agent",
-        "icon": "fleet",
-        "metric": "Utilization +25%",
-        "desc": "Unified fleet capacity scheduling, intelligent order-vehicle matching based on order demand and vehicle status to maximize utilization.",
+        "name": "车队管理智能体",
+        "icon": "队",
+        "metric": "五维多目标匹配评分",
+        "desc": "统一车队运力调度，基于订单需求与车辆状态进行订单-车辆智能匹配，最大化车队利用率（调度沙盘推演演示）。",
         "capabilities": [
-            "Real-time fleet capacity profiling",
-            "Intelligent order-vehicle matching",
-            "Driver shift optimization",
-            "Empty-trip governance and return freight matching",
+            "车队运力实时画像",
+            "订单-车辆智能匹配（氢量/距离/效用/成本/负载）",
+            "司机换班方案优化",
+            "空驶治理与回程货源匹配",
         ],
-        "tech": "Multi-objective Weighted Scoring (5-dimension) + Greedy Assignment",
+        "tech": "五维多目标加权评分 + 贪心分配",
         "scenario": "fleet_management",
     },
     {
         "key": "cost_analysis",
-        "name": "Cost Analysis Agent",
-        "icon": "cost",
-        "metric": "Operating cost -18%",
-        "desc": "Full-chain cost breakdown: hydrogen, maintenance, labor, depreciation. Provides multi-dimensional cost analysis and optimization recommendations.",
+        "name": "成本分析智能体",
+        "icon": "¥",
+        "metric": "对标柴油成本节省测算",
+        "desc": "氢能重卡全链路成本拆解（燃料、维护），对标同级柴油重卡计算成本节省，公式与参数全程透明可解释。",
         "capabilities": [
-            "Per-vehicle full cost accounting",
-            "Hydrogen price fluctuation impact analysis",
-            "Maintenance cost prediction",
-            "TCO benchmarking and optimization path",
+            "单车成本核算（公式：氢耗×氢价 + 里程×维护单价）",
+            "氢价波动对运营成本的敏感性分析",
+            "维护成本预测",
+            "TCO 全生命周期对标与优化路径",
         ],
-        "tech": "OLAP + LLM Attribution Analysis",
+        "tech": "成本测算模型 + LLM 归因分析",
         "scenario": "cost_analysis",
     },
     {
         "key": "fuelcell_health",
-        "name": "Fuel Cell Health Agent",
-        "icon": "health",
-        "metric": "Health score 0-100 + RUL prediction",
-        "desc": "Based on stack voltage, temperature, degradation rate and other multi-dimensional data to predict fuel cell health status and remaining lifespan.",
+        "name": "燃料电池健康智能体",
+        "icon": "康",
+        "metric": "健康评分 0-100 + 寿命预测",
+        "desc": "基于电堆电压、温度、衰减速率等多维真实遥测数据，评估燃料电池健康状态并预测剩余使用寿命。",
         "capabilities": [
-            "Polarization curve sampling across power ranges",
-            "Thermal stress analysis (inlet-outlet temperature differential)",
-            "Efficiency analysis (power vs hydrogen consumption)",
-            "Degradation trend prediction and RUL estimation",
-            "Health score computation (0-100) and maintenance recommendations",
+            "全功率段极化曲线采样分析",
+            "热应力分析（进出口温差）",
+            "效率分析（功率 vs 氢耗）",
+            "衰减趋势预测与剩余寿命（RUL）估计",
+            "健康评分（0-100）与维护建议",
         ],
-        "tech": "Polarization Curve Analysis + Linear RUL Prediction",
+        "tech": "极化曲线分析 + 线性 RUL 预测",
         "scenario": "fuelcell_health",
     },
 ]
@@ -234,11 +234,40 @@ def execute_agent_stream(agent_key: str, req: AgentExecRequest):
             yield "data: [DONE]\n\n"
             return
         try:
+            import queue
+            import threading
+
             from ..react_engine import ReactEngine
 
             engine = ReactEngine(react_req)
-            for event in engine.run_stream():
-                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            # ReAct 循环耗时可能数分钟 (多次 LLM 调用+重试),
+            # 在后台线程执行, 主协程每 5s 发 SSE 心跳防止网关/浏览器空闲断连
+            q: "queue.Queue[dict | None]" = queue.Queue()
+
+            def _worker():
+                try:
+                    for ev in engine.run_stream():
+                        q.put(ev)
+                except Exception as e:  # noqa: BLE001
+                    logger.error("Agent '%s' stream failed: %s", agent_key, e)
+                    q.put({"type": "error", "message": f"推理失败: {e}"})
+                finally:
+                    q.put(None)  # 结束哨兵
+
+            threading.Thread(target=_worker, daemon=True).start()
+
+            import time as _time
+
+            while True:
+                try:
+                    ev = q.get(timeout=5.0)
+                except queue.Empty:
+                    # 心跳: SSE 注释行, 前端自动忽略, 但保活连接
+                    yield ": ping\n\n"
+                    continue
+                if ev is None:
+                    break
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:  # noqa: BLE001 - top-level guard for the stream
             logger.error("Agent '%s' stream failed: %s", agent_key, e)

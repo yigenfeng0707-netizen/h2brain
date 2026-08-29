@@ -64,7 +64,7 @@ export default function ReactPanel() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="h2-panel" style={{ padding: 16 }}>
-        <h2 style={{ color: '#69F0AE', marginBottom: 12 }}>ReAct 决策推理面板</h2>
+        <h2 style={{ color: '#69F0AE', marginBottom: 12 }}>智能决策推理面板（ReAct）</h2>
         <Row gutter={[8, 8]} align="middle">
           <Col xs={24} md={6}>
             <Select
@@ -105,7 +105,7 @@ export default function ReactPanel() {
       {loading && (
         <div className="h2-panel" style={{ padding: 40, textAlign: 'center' }}>
           <Spin size="large" />
-          <div style={{ color: '#69F0AE', marginTop: 16 }}>Agent 正在思考中...</div>
+          <div style={{ color: '#69F0AE', marginTop: 16 }}>智能体正在思考中...</div>
         </div>
       )}
 
@@ -116,17 +116,17 @@ export default function ReactPanel() {
               <Col key={i} xs={24}>
                 <div className="h2-panel" style={{ padding: 16, borderLeft: `3px solid ${STEP_COLORS[i % STEP_COLORS.length]}` }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                    <Tag color="green" style={{ fontSize: 14, padding: '2px 8px' }}>Step {i + 1}</Tag>
+                    <Tag color="green" style={{ fontSize: 14, padding: '2px 8px' }}>第 {i + 1} 步</Tag>
                   </div>
                   <div style={{ marginBottom: 6 }}>
-                    <Text style={{ color: STEP_COLORS[i % STEP_COLORS.length], fontWeight: 700 }}>Thought: </Text>
+                    <Text style={{ color: STEP_COLORS[i % STEP_COLORS.length], fontWeight: 700 }}>思考： </Text>
                     <Text style={{ color: 'rgba(224,245,232,0.85)' }}>{step.thought}</Text>
                   </div>
                   <div style={{ marginBottom: 6, fontFamily: 'monospace', fontSize: 12, color: '#00E5FF' }}>
-                    Action: {step.action}
+                    行动：{step.action}
                   </div>
                   <div>
-                    <Text style={{ color: 'rgba(224,245,232,0.6)', fontWeight: 600 }}>Observation: </Text>
+                    <Text style={{ color: 'rgba(224,245,232,0.6)', fontWeight: 600 }}>观察结果： </Text>
                     <Text style={{ color: 'rgba(224,245,232,0.7)' }}>{step.observation}</Text>
                   </div>
                 </div>
@@ -135,7 +135,7 @@ export default function ReactPanel() {
           </Row>
 
           <div className="h2-panel" style={{ padding: 20, border: '1px solid rgba(105,240,174,0.4)' }}>
-            <h3 style={{ color: '#69F0AE', marginBottom: 8 }}>Final Answer</h3>
+            <h3 style={{ color: '#69F0AE', marginBottom: 8 }}>最终结论</h3>
             <Paragraph style={{ color: 'rgba(224,245,232,0.9)', fontSize: 14, lineHeight: 1.8 }}>
               {result.final_answer}
             </Paragraph>

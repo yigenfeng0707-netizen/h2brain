@@ -174,6 +174,13 @@ export default function Dispatch() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div className="h2-panel" style={{ padding: '10px 16', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h2 style={{ color: '#69F0AE', margin: 0, fontSize: 18 }}>智能调度大屏</h2>
+        <Tag color="orange">调度推演沙盘数据</Tag>
+        <span style={{ color: 'rgba(224,245,232,0.45)', fontSize: 12 }}>
+          本页车辆/订单/加氢站为调度算法演示沙盘（北京大兴示范区场景）；真实测试车辆（V1/V2）分析请看「运营总览大屏」「行程分析看板」。
+        </span>
+      </div>
       <Row gutter={[8, 8]}>
         <Col xs={24} lg={14}>
           <div className="h2-panel" style={{ padding: 16 }}>
