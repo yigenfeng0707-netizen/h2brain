@@ -34,6 +34,11 @@ _store_lock = threading.Lock()
 _IMAGE_PATH = "/images/generations"
 # 生成超时（商汤出图实测约 10-60 秒）
 _TIMEOUT_S = 120
+# 请求尺寸：默认 2496x1664 约 6MB，容器出网传大图易被商汤端断连（incomplete chunked read），
+# 1024x1024 仅 1.4MB，周报配图展示足够且传输稳定
+_IMAGE_SIZE = "1024x1024"
+# 断连重试次数（peer closed connection 属商汤端偶发断流）
+_MAX_RETRIES = 2
 
 
 def _build_kpi_summary() -> tuple[dict[str, Any], str]:
@@ -105,22 +110,36 @@ def generate_report_image(theme: str = "") -> dict[str, Any]:
     prompt = _build_prompt(theme, kpi)
 
     url = settings.image_base_url.rstrip("/") + _IMAGE_PATH
-    with httpx.Client(trust_env=False, timeout=_TIMEOUT_S) as client:
-        resp = client.post(
-            url,
-            headers={
-                "Authorization": f"Bearer {settings.image_api_key}",
-                "Content-Type": "application/json",
-            },
-            json={"model": settings.image_model, "prompt": prompt},
-        )
-    if resp.status_code != 200:
-        raise RuntimeError(f"图像模型返回 {resp.status_code}: {resp.text[:200]}")
-
-    data = resp.json().get("data") or [{}]
-    b64 = (data[0] or {}).get("b64_json") if data else None
-    if not b64:
-        raise RuntimeError("图像模型未返回图片数据（b64_json 为空）")
+    last_err: Exception | None = None
+    for attempt in range(_MAX_RETRIES + 1):
+        try:
+            with httpx.Client(trust_env=False, timeout=_TIMEOUT_S) as client:
+                resp = client.post(
+                    url,
+                    headers={
+                        "Authorization": f"Bearer {settings.image_api_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": settings.image_model,
+                        "prompt": prompt,
+                        "size": _IMAGE_SIZE,
+                    },
+                )
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"图像模型返回 {resp.status_code}: {resp.text[:200]}"
+                )
+            data = resp.json().get("data") or [{}]
+            b64 = (data[0] or {}).get("b64_json") if data else None
+            if not b64:
+                raise RuntimeError("图像模型未返回图片数据（b64_json 为空）")
+            break
+        except Exception as e:  # noqa: BLE001 - 断连/超时重试
+            last_err = e
+            logger.warning("图像生成第 %d 次尝试失败: %s", attempt + 1, e)
+    else:
+        raise RuntimeError(f"图像生成重试 {_MAX_RETRIES + 1} 次仍失败: {last_err}")
 
     png = base64.b64decode(b64)
     image_id = uuid.uuid4().hex[:12]

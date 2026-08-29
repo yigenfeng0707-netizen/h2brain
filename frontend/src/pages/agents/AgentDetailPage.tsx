@@ -132,7 +132,7 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
     const msgId = `img-${Date.now()}`
     setMessages(prev => [...prev, {
       role: 'agent',
-      content: '正在生成运营周报配图…（商汤图像模型，基于真实 KPI 构建提示词，约 10-60 秒）',
+      content: '正在生成运营周报配图…（商汤图像模型，基于真实 KPI 构建提示词，约 30-120 秒，网络抖动会自动重试）',
       timestamp: ts(), thinking: true, key: msgId,
     }])
     setImgLoading(true)
@@ -142,10 +142,10 @@ export default function AgentDetailPage({ agentKey }: { agentKey: string }) {
       const res = await apiPost.reportImage({})
       const taskId = res.data?.task_id
       if (!taskId) throw new Error('未返回任务 ID')
-      // 2) 轮询状态（每 3 秒，上限 150 秒）
+      // 2) 轮询状态（每 4 秒，上限 240 秒，含后端断连重试时间）
       let d: any = null
-      for (let i = 0; i < 50; i++) {
-        await sleep(3000)
+      for (let i = 0; i < 60; i++) {
+        await sleep(4000)
         const st = await api.get(`/agents/report-image/task/${taskId}`, { timeout: 15000 })
         d = st.data
         if (d?.status === 'failed') throw new Error(d?.error || '生成失败')
